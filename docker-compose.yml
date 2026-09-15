@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  eventsim:
+    build:
+      context: eventsim/.
+      dockerfile: Dockerfile
+    image: eventsim:2.0
+    container_name: eventsim
+    volumes:
+      # Map thư mục output từ container ra máy host để lấy dữ liệu profile
+      - ./data:/opt/eventsim/output_data
+    # Cấu hình sinh dữ liệu mẫu ra thư mục output_data
+    command:
+      - "-c"
+      - "examples/config.json"
+      - "--start-time"
+      - "2026-09-01T00:00:00"
+      - "--end-time"
+      - "2026-09-08T00:00:00"
+      - "-n"
+      - "1000"
+      - "--growth-rate"
+      - "0"
+      - "--userid"
+      - "1"
+      - "--randomseed"
+      - "1"
+      - "--nocontinuous"
+      - "output_data"
