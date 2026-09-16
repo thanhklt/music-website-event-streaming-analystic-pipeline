@@ -1,0 +1,27 @@
+services:
+  kafka:
+    image: apache/kafka:4.3.1
+    container_name: kafka
+    ports:
+      - "9092:9092"   # INTERNAL — cho container trong Docker network
+      - "9093:9093"   # EXTERNAL — cho host machine (localhost:9093)
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+
+      KAFKA_LISTENERS: "INTERNAL://:9092,EXTERNAL://:9093,CONTROLLER://:9094"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka:9092,EXTERNAL://localhost:9093"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@localhost:9094"
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      # KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      # KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+
+volumes:
+  kafka-data:
