@@ -45,7 +45,11 @@ events_df = (
         "raw_json",
         "event.*",
     )
+    .withWatermark("kafka_timestamp", "30 minutes")
+    .dropDuplicates(["ts", "sessionId", "userId"])
 )
+
+
 
 # Xuất ra micro-batch
 print("Bắt đầu lắng nghe dữ liệu từ Kafka topic 'test_events'...")
