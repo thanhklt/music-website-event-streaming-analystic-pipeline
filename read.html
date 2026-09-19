@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EventPulse | Real-Time Event Stream Analytics Pipeline</title>
+  <meta name="description" content="Nền tảng phân tích và xử lý luồng dữ liệu thời gian thực quy mô lớn với Apache Kafka và Spark Streaming.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #07090e;
+      --bg-card: rgba(16, 21, 35, 0.7);
+      --bg-card-hover: rgba(23, 31, 54, 0.85);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(99, 102, 241, 0.5);
+      
+      --primary: #6366f1;
+      --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+      --accent-cyan: #06b6d4;
+      --accent-purple: #8b5cf6;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --glow-cyan: 0 0 35px rgba(6, 182, 212, 0.25);
+      --glow-purple: 0 0 35px rgba(99, 102, 241, 0.3);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* Ambient Background Gradients */
+    .ambient-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .ambient-orb-1 {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+      top: -150px;
+      left: 10%;
+      filter: blur(80px);
+      animation: floatSlow 18s ease-in-out infinite alternate;
+    }
+
+    .ambient-orb-2 {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, rgba(0, 0, 0, 0) 70%);
+      top: 35%;
+      right: 5%;
+      filter: blur(90px);
+      animation: floatSlow 14s ease-in-out infinite alternate-reverse;
+    }
+
+    .ambient-grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+    }
+
+    @keyframes floatSlow {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(40px, 60px) scale(1.08); }
+      100% { transform: translate(-30px, 30px) scale(0.95); }
+    }
+
+    /* Layout Container */
+    .container {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header & Navbar */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(7, 9, 14, 0.82);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-color);
+      transition: all 0.3s ease;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 76px;
+    }
+
+    .logo-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-main);
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-sm);
+      background: var(--primary-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.92rem;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-main);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: var(--radius-full);
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent-emerald);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-emerald);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 22px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--primary-gradient);
+      color: #ffffff;
+      box-shadow: 0 4px 20px rgba(79, 70, 229, 0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 28px rgba(79, 70, 229, 0.55);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      backdrop-filter: blur(8px);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 96px 0 64px;
+      text-align: center;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: var(--radius-full);
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+
+    .hero-badge svg {
+      color: var(--accent-cyan);
+    }
+
+    .hero h1 {
+      font-size: clamp(2.4rem, 5vw, 4.2rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 24px;
+      max-width: 960px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .gradient-text {
+      background: linear-gradient(120deg, #ffffff 30%, #a5b4fc 70%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: clamp(1.05rem, 2vw, 1.25rem);
+      color: var(--text-muted);
+      max-width: 760px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+    }
+
+    .hero-cta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 60px;
+    }
+
+    /* Stats Banner */
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-bottom: 80px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      text-align: left;
+      backdrop-filter: blur(12px);
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s ease;
+    }
+
+    .stat-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--primary-gradient);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .stat-card:hover::after {
+      opacity: 1;
+    }
+
+    .stat-value {
+      font-size: 2.2rem;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      color: #fff;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .stat-unit {
+      font-size: 1rem;
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    .stat-label {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    /* Live Pipeline Architecture Interactive Section */
+    .section-title {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .section-tag {
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      letter-spacing: 0.12em;
+      color: var(--accent-cyan);
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .section-title h2 {
+      font-size: clamp(1.8rem, 3.5vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+
+    .section-title p {
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto;
+      font-size: 1rem;
+    }
+
+    .pipeline-interactive {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 40px;
+      backdrop-filter: blur(16px);
+      margin-bottom: 80px;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    }
+
+    .pipeline-flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      position: relative;
+    }
+
+    @media (max-width: 992px) {
+      .pipeline-flow {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .flow-node {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .flow-node.active, .flow-node:hover {
+      background: rgba(99, 102, 241, 0.1);
+      border-color: var(--primary);
+      transform: translateY(-4px);
+      box-shadow: var(--glow-purple);
+    }
+
+    .node-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .node-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    .node-1 .node-icon { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+    .node-2 .node-icon { background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); }
+    .node-3 .node-icon { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); }
+    .node-4 .node-icon { background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); }
+
+    .node-title {
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .node-role {
+      font-size: 0.76rem;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .node-desc {
+      font-size: 0.86rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .node-metrics {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .metric-label { color: var(--text-dim); }
+    .metric-val { color: var(--accent-cyan); font-weight: 600; }
+
+    /* Interactive Live Simulation Console */
+    .simulator-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 24px;
+      margin-bottom: 96px;
+    }
+
+    @media (max-width: 900px) {
+      .simulator-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .sim-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      backdrop-filter: blur(14px);
+    }
+
+    .sim-panel h3 {
+      font-size: 1.25rem;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sim-panel p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .event-btn {
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      font-weight: 600;
+      font-size: 0.88rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s;
+    }
+
+    .event-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .event-btn.active {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.15);
+    }
+
+    .stream-toggle-box {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 18px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .toggle-sub {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+
+    /* Terminal Console */
+    .terminal-window {
+      background: #090c13;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      height: 440px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+
+    .terminal-bar {
+      height: 38px;
+      background: #111624;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 8px;
+    }
+
+    .term-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .dot-red { background: #ef4444; }
+    .dot-yellow { background: #eab308; }
+    .dot-green { background: #22c55e; }
+
+    .terminal-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-left: auto;
+    }
+
+    .terminal-body {
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .term-line {
+      display: flex;
+      gap: 10px;
+      word-break: break-all;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .term-time { color: var(--text-dim); }
+    .term-tag { font-weight: 700; }
+    .tag-spark { color: var(--accent-purple); }
+    .tag-kafka { color: var(--accent-cyan); }
+    .tag-eventsim { color: var(--accent-amber); }
+    .tag-err { color: var(--accent-rose); }
+    .tag-success { color: var(--accent-emerald); }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 28px;
+      margin-bottom: 96px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 32px;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .feature-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(99, 102, 241, 0.4);
+      transform: translateY(-4px);
+    }
+
+    .feature-icon-wrapper {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-cyan);
+      margin-bottom: 20px;
+    }
+
+    .feature-card h4 {
+      font-size: 1.18rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    /* Tech Stack Specs Table */
+    .specs-table-wrapper {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      margin-bottom: 96px;
+    }
+
+    .specs-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 0.92rem;
+    }
+
+    .specs-table th {
+      text-align: left;
+      padding: 14px 18px;
+      color: var(--text-dim);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-color);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+
+    .specs-table td {
+      padding: 16px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+    }
+
+    .specs-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tech-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 0.78rem;
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-color);
+    }
+
+    /* CTA Section */
+    .cta-banner {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 64px 32px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 96px;
+    }
+
+    .cta-banner h3 {
+      font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+      font-weight: 800;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .cta-banner p {
+      color: var(--text-muted);
+      max-width: 620px;
+      margin: 0 auto 32px;
+      font-size: 1.05rem;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-color);
+      padding: 48px 0;
+      color: var(--text-dim);
+      font-size: 0.88rem;
+    }
+
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+
+    .footer-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Light Effects -->
+  <div class="ambient-bg">
+    <div class="ambient-orb-1"></div>
+    <div class="ambient-orb-2"></div>
+    <div class="ambient-grid"></div>
+  </div>
+
+  <!-- Header Navigation -->
+  <header>
+    <div class="container">
+      <nav>
+        <a href="#" class="logo-box" id="brand-logo">
+          <div class="logo-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+          <span>EventPulse</span>
+        </a>
+
+        <ul class="nav-links">
+          <li><a href="#architecture">Kiến Trúc</a></li>
+          <li><a href="#simulator">Mô Phỏng Trực Tiếp</a></li>
+          <li><a href="#features">Tính Năng</a></li>
+          <li><a href="#specs">Thông Số Kỹ Thuật</a></li>
+        </ul>
+
+        <div class="nav-actions">
+          <div class="status-badge" id="system-status">
+            <span class="pulse-dot"></span>
+            <span>PIPELINE ACTIVE</span>
+          </div>
+          <a href="#simulator" class="btn btn-primary" id="nav-launch-btn">Trải Nghiệm Live</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main>
+    <section class="hero">
+      <div class="container">
+        <div class="hero-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polygon points="10 8 16 12 10 16 10 8"></polygon>
+          </svg>
+          <span>Kiến Trúc Stream Processing Hiện Đại</span>
+        </div>
+
+        <h1>
+          Nền Tảng Phân Tích Luồng Dữ Liệu Thời Gian Thực <br>
+          <span class="gradient-text">Kafka & Spark Streaming</span>
+        </h1>
+
+        <p>
+          Hệ thống ingestion và xử lý dữ liệu sự kiện EventSim quy mô lớn. 
+          Giám sát hành vi người dùng, phát hiện bất thường và tổng hợp số liệu phân tích với độ trễ chỉ tính bằng mili-giây.
+        </p>
+
+        <div class="hero-cta">
+          <a href="#simulator" class="btn btn-primary" id="hero-start-sim">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Khởi Động Live Stream
+          </a>
+          <a href="#architecture" class="btn btn-secondary" id="hero-view-arch">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+              <line x1="6" y1="6" x2="6.01" y2="6"></line>
+              <line x1="6" y1="18" x2="6.01" y2="18"></line>
+            </svg>
+            Khám Phá Luồng Pipeline
+          </a>
+        </div>
+
+        <!-- Real-time Stats Counter Cards -->
+        <div class="stats-container">
+          <div class="stat-card">
+            <div class="stat-value"><span id="stat-events">1,482,920</span><span class="stat-unit">+</span></div>
+            <div class="stat-label">Sự kiện đã xử lý</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value"><span id="stat-throughput">48.5</span><span class="stat-unit">k/s</span></div>
+            <div class="stat-label">Tốc độ nạp (Throughput)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value"><span id="stat-latency">12</span><span class="stat-unit">ms</span></div>
+            <div class="stat-label">Độ trễ trung bình E2E</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">99.99<span class="stat-unit">%</span></div>
+            <div class="stat-label">Độ sẵn sàng (SLA Uptime)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section id="architecture" class="container">
+      <div class="section-title">
+        <span class="section-tag">Hạ Tầng Luồng Dữ Liệu</span>
+        <h2>Kiến Trúc Pipeline Đa Tầng Hoàn Chỉnh</h2>
+        <p>Từ việc sinh dữ liệu sự kiện nghe nhạc giả lập (EventSim) đến cụm Kafka phân tán và Spark Structured Streaming.</p>
+      </div>
+
+      <div class="pipeline-interactive">
+        <div class="pipeline-flow">
+          <!-- Stage 1 -->
+          <div class="flow-node node-1 active" onclick="selectNode(1)" id="node-stage-1">
+            <div class="node-header">
+              <div class="node-icon">🎵</div>
+              <div>
+                <div class="node-title">EventSim Producer</div>
+                <div class="node-role">eventsim_events.json</div>
+              </div>
+            </div>
+            <p class="node-desc">Giả lập hàng chục nghìn phiên người dùng: NextSong, Login, Add to Playlist, Logout liên tục theo thời gian thực.</p>
+            <div class="node-metrics">
+              <span class="metric-label">Giao thức:</span>
+              <span class="metric-val">JSON over TCP</span>
+            </div>
+          </div>
+
+          <!-- Stage 2 -->
+          <div class="flow-node node-2" onclick="selectNode(2)" id="node-stage-2">
+            <div class="node-header">
+              <div class="node-icon">⚡</div>
+              <div>
+                <div class="node-title">Apache Kafka Broker</div>
+                <div class="node-role">Topic: eventsim-stream</div>
+              </div>
+            </div>
+            <p class="node-desc">Phân vùng (partitions) phân tán, lưu trữ đệm phân đoạn tin nhắn với cơ chế sao lưu fault-tolerant và zero-data-loss.</p>
+            <div class="node-metrics">
+              <span class="metric-label">Partitions:</span>
+              <span class="metric-val">6 Replicated</span>
+            </div>
+          </div>
+
+          <!-- Stage 3 -->
+          <div class="flow-node node-3" onclick="selectNode(3)" id="node-stage-3">
+            <div class="node-header">
+              <div class="node-icon">🔥</div>
+              <div>
+                <div class="node-title">Spark Streaming</div>
+                <div class="node-role">connect_kafka.py</div>
+              </div>
+            </div>
+            <p class="node-desc">Spark Structured Streaming vi phân lô (micro-batch), lọc schema, tính toán sliding windows và tổng hợp KPI người dùng.</p>
+            <div class="node-metrics">
+              <span class="metric-label">Batch Interval:</span>
+              <span class="metric-val">1.0 giây</span>
+            </div>
+          </div>
+
+          <!-- Stage 4 -->
+          <div class="flow-node node-4" onclick="selectNode(4)" id="node-stage-4">
+            <div class="node-header">
+              <div class="node-icon">📊</div>
+              <div>
+                <div class="node-title">Storage & Analytics</div>
+                <div class="node-role">Parquet / Sink / BI</div>
+              </div>
+            </div>
+            <p class="node-desc">Xuất dữ liệu đã làm sạch vào Data Lake (Parquet/Delta) và cung cấp API truy vấn thời gian thực cho Dashboard.</p>
+            <div class="node-metrics">
+              <span class="metric-label">Sink:</span>
+              <span class="metric-val">HDFS / S3 / DB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Live Simulation Console -->
+    <section id="simulator" class="container">
+      <div class="section-title">
+        <span class="section-tag">Bảng Điều Khiển Tương Tác</span>
+        <h2>Mô Phỏng Luồng Sự Kiện Trực Tiếp</h2>
+        <p>Bấm các nút bên dưới để tạo sự kiện mô phỏng và quan sát luồng JSON chuyển đổi trực tiếp qua các tiến trình.</p>
+      </div>
+
+      <div class="simulator-grid">
+        <!-- Control Panel -->
+        <div class="sim-panel">
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-cyan);">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            Tạo Tín Hiệu Sự Kiện
+          </h3>
+          <p>Kích hoạt các loại hành vi người dùng để đưa vào Kafka Producer ngay lập tức.</p>
+
+          <div class="btn-group">
+            <button class="event-btn" id="btn-next-song" onclick="generateEvent('NextSong')">
+              <span>🎵</span> NextSong Event
+            </button>
+            <button class="event-btn" id="btn-login" onclick="generateEvent('Login')">
+              <span>👤</span> User Login
+            </button>
+            <button class="event-btn" id="btn-add-playlist" onclick="generateEvent('AddToPlaylist')">
+              <span>➕</span> Add To Playlist
+            </button>
+            <button class="event-btn" id="btn-error" onclick="generateEvent('404Error')">
+              <span>⚠️</span> Error 404/500
+            </button>
+          </div>
+
+          <div class="stream-toggle-box">
+            <div>
+              <div class="toggle-label">Luồng Sự Kiện Tự Động (Auto-Stream)</div>
+              <div class="toggle-sub">Liên tục phát sinh events ngẫu nhiên mỗi 800ms</div>
+            </div>
+            <button class="btn btn-secondary" id="btn-toggle-stream" onclick="toggleAutoStream()">
+              Bật Tự Động
+            </button>
+          </div>
+        </div>
+
+        <!-- Terminal Display -->
+        <div class="terminal-window">
+          <div class="terminal-bar">
+            <span class="term-dot dot-red"></span>
+            <span class="term-dot dot-yellow"></span>
+            <span class="term-dot dot-green"></span>
+            <span class="terminal-title">eventsim@spark-cluster: /logs/realtime.stream</span>
+          </div>
+          <div class="terminal-body" id="terminal-content">
+            <div class="term-line">
+              <span class="term-time">[00:00:01]</span>
+              <span class="term-tag tag-kafka">[KAFKA]</span>
+              <span>Broker connected at localhost:9092. Topic 'eventsim-stream' ready.</span>
+            </div>
+            <div class="term-line">
+              <span class="term-time">[00:00:02]</span>
+              <span class="term-tag tag-spark">[SPARK]</span>
+              <span>Spark Structured Streaming session initialized. Micro-batch checkpoint verified.</span>
+            </div>
+            <div class="term-line">
+              <span class="term-time">[00:00:03]</span>
+              <span class="term-tag tag-success">[READY]</span>
+              <span>Hệ thống sẵn sàng tiếp nhận sự kiện. Hãy bấm các nút bên trái để phát tín hiệu.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="container">
+      <div class="section-title">
+        <span class="section-tag">Tính Năng Cốt Lõi</span>
+        <h2>Tối Ưu Cho Khối Lượng Dữ Liệu Lớn</h2>
+        <p>Giải pháp toàn diện đáp ứng bài toán phân tích hành vi và sự kiện thời gian thực chuẩn công nghiệp.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+          </div>
+          <h4>Xử Lý Luồng Tốc Độ Cao</h4>
+          <p>Tận dụng cơ chế Micro-batching của Spark Structured Streaming để duy trì thông lượng hàng chục nghìn bản ghi mỗi giây với độ trễ tối thiểu.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+          </div>
+          <h4>Chống Thất Thoát Dữ Liệu (Exactly-Once)</h4>
+          <p>Sử dụng Kafka Offsets kết hợp Checkpointing và Write-Ahead Logs (WAL) trong Spark đảm bảo tính toàn vẹn dữ liệu ngay cả khi container gặp sự cố.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+          </div>
+          <h4>Schema Tự Động Định Dạng</h4>
+          <p>Chuẩn hóa các sự kiện JSON phức tạp từ EventSim (userId, song, artist, duration, ts) thành Dataframe có cấu trúc chuẩn xác để phân tích.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          </div>
+          <h4>Windowing & Cửa Sổ Trượt</h4>
+          <p>Thống kê số lượng bài hát được nghe nhiều nhất, tỷ lệ người dùng hoạt động theo từng cửa sổ 5 phút, 15 phút với độ chính xác cao.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+          </div>
+          <h4>Đóng Gói Docker Đồng Bộ</h4>
+          <p>Khởi chạy toàn bộ môi trường Zookeeper, Kafka Brokers và Spark Master/Workers thông qua Docker Compose chỉ với một dòng lệnh duy nhất.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"></line>
+              <line x1="12" y1="20" x2="12" y2="4"></line>
+              <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+          </div>
+          <h4>Tích Hợp Dễ Dàng Với BI</h4>
+          <p>Dễ dàng kết nối output với Elasticsearch, Grafana, PostgreSQL hoặc lưu trữ dạng nén cột Parquet trên Data Lake phục vụ Machine Learning.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Technical Specs Section -->
+    <section id="specs" class="container">
+      <div class="specs-table-wrapper">
+        <div class="section-title" style="margin-bottom: 24px; text-align: left;">
+          <span class="section-tag">Thông Số Thành Phần</span>
+          <h2>Thông Số Kỹ Thuật Pipeline</h2>
+        </div>
+
+        <table class="specs-table">
+          <thead>
+            <tr>
+              <th>Thành Phần</th>
+              <th>Công Nghệ / Phiên Bản</th>
+              <th>Cấu Hình & Vai Trò</th>
+              <th>Trạng Thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Message Broker</strong></td>
+              <td><span class="tech-pill">Apache Kafka 7.4.x</span></td>
+              <td>Cụm phân tán, port 9092, topic đa phân vùng, tối ưu cho high throughput</td>
+              <td><span style="color: var(--accent-emerald);">● Online</span></td>
+            </tr>
+            <tr>
+              <td><strong>Stream Processor</strong></td>
+              <td><span class="tech-pill">Apache Spark 3.4 / PySpark</span></td>
+              <td>Structured Streaming với trigger 1s, micro-batch processing và checkpointing</td>
+              <td><span style="color: var(--accent-emerald);">● Online</span></td>
+            </tr>
+            <tr>
+              <td><strong>Event Generator</strong></td>
+              <td><span class="tech-pill">EventSim Tool</span></td>
+              <td>Sinh log giả lập hành vi người dùng nghe nhạc theo phân phối thực tế</td>
+              <td><span style="color: var(--accent-cyan);">● Simulated</span></td>
+            </tr>
+            <tr>
+              <td><strong>Containerization</strong></td>
+              <td><span class="tech-pill">Docker & Docker Compose</span></td>
+              <td>Quản lý vòng đời dịch vụ, mạng nội bộ độc lập (bridge network)</td>
+              <td><span style="color: var(--accent-emerald);">● Running</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CTA Banner -->
+    <section class="container">
+      <div class="cta-banner">
+        <h3>Sẵn Sàng Triển Khai Hệ Thống Của Bạn?</h3>
+        <p>Bắt đầu xử lý dữ liệu hàng triệu sự kiện mỗi ngày với cấu trúc chuẩn mã nguồn mở.</p>
+        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+          <a href="#simulator" class="btn btn-primary" id="cta-bottom-btn">Mở Trình Mô Phỏng</a>
+          <a href="#" class="btn btn-secondary" onclick="alert('Hãy kiểm tra file spark/connect_kafka.py và kafka/docker-compose.yml trong dự án!')">Xem Mã Nguồn Pipeline</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="logo-icon" style="width: 28px; height: 28px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+          <span style="color: var(--text-main); font-weight: 700;">EventPulse</span>
+          <span>© 2026 EventSim Streaming Analytics.</span>
+        </div>
+
+        <ul class="footer-links">
+          <li><a href="#architecture">Kiến Trúc</a></li>
+          <li><a href="#simulator">Mô Phỏng</a></li>
+          <li><a href="#features">Tính Năng</a></li>
+          <li><a href="#specs">Thông Số</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Interactive JavaScript Logic -->
+  <script>
+    // Live Event Counter Ticker
+    let totalEvents = 1482920;
+    const statEventsEl = document.getElementById('stat-events');
+    const statThroughputEl = document.getElementById('stat-throughput');
+    const statLatencyEl = document.getElementById('stat-latency');
+
+    setInterval(() => {
+      const increment = Math.floor(Math.random() * 45) + 15;
+      totalEvents += increment;
+      if (statEventsEl) {
+        statEventsEl.textContent = totalEvents.toLocaleString('en-US');
+      }
+      if (statThroughputEl && Math.random() > 0.6) {
+        const tp = (47 + Math.random() * 3.5).toFixed(1);
+        statThroughputEl.textContent = tp;
+      }
+      if (statLatencyEl && Math.random() > 0.7) {
+        const lat = Math.floor(10 + Math.random() * 5);
+        statLatencyEl.textContent = lat;
+      }
+    }, 1200);
+
+    // Interactive Node Selection
+    function selectNode(index) {
+      document.querySelectorAll('.flow-node').forEach((node, idx) => {
+        if (idx + 1 === index) {
+          node.classList.add('active');
+        } else {
+          node.classList.remove('active');
+        }
+      });
+
+      const stages = [
+        "EventSim Producer: Giả lập lưu lượng người dùng tương tác với dịch vụ stream nhạc.",
+        "Kafka Cluster: Nhận và lưu đệm tin nhắn với độ trễ cực thấp.",
+        "Spark Streaming: Đọc từ Kafka, trích xuất schema JSON, tổng hợp số liệu.",
+        "Data Sink: Xuất kết quả phân tích phục vụ Dashboard thời gian thực."
+      ];
+      logToTerminal('PIPELINE', stages[index - 1], 'tag-kafka');
+    }
+
+    // Interactive Terminal Logger
+    const terminalContent = document.getElementById('terminal-content');
+    
+    function logToTerminal(tag, message, tagClass = 'tag-kafka') {
+      if (!terminalContent) return;
+      const now = new Date();
+      const timeStr = `[${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}]`;
+      
+      const line = document.createElement('div');
+      line.className = 'term-line';
+      line.innerHTML = `
+        <span class="term-time">${timeStr}</span>
+        <span class="term-tag ${tagClass}">[${tag}]</span>
+        <span>${message}</span>
+      `;
+      
+      terminalContent.appendChild(line);
+      terminalContent.scrollTop = terminalContent.scrollHeight;
+
+      // Keep only last 50 lines to prevent memory bloat
+      while (terminalContent.children.length > 50) {
+        terminalContent.removeChild(terminalContent.firstChild);
+      }
+    }
+
+    // Event Simulation Generator
+    const songs = [
+      { title: "Blinding Lights", artist: "The Weeknd", duration: 200 },
+      { title: "Shape of You", artist: "Ed Sheeran", duration: 233 },
+      { title: "Starboy", artist: "The Weeknd", duration: 230 },
+      { title: "Levitating", artist: "Dua Lipa", duration: 203 },
+      { title: "Stay", artist: "The Kid LAROI, Justin Bieber", duration: 141 }
+    ];
+
+    const users = [1042, 2088, 3019, 4110, 5022, 9081];
+
+    function generateEvent(type) {
+      const user = users[Math.floor(Math.random() * users.length)];
+      const song = songs[Math.floor(Math.random() * songs.length)];
+      const ts = Date.now();
+
+      if (type === 'NextSong') {
+        const payload = JSON.stringify({
+          userId: user,
+          page: "NextSong",
+          song: song.title,
+          artist: song.artist,
+          duration: song.duration,
+          sessionId: Math.floor(Math.random() * 9000 + 1000),
+          ts: ts
+        });
+        logToTerminal('KAFKA-PROD', `Published to topic 'eventsim-stream': ${payload}`, 'tag-eventsim');
+        setTimeout(() => {
+          logToTerminal('SPARK-INGEST', `Batch #processed: User ${user} listened to "${song.title}" by ${song.artist}`, 'tag-spark');
+        }, 300);
+      } else if (type === 'Login') {
+        const payload = JSON.stringify({ userId: user, page: "Login", level: "paid", ts: ts });
+        logToTerminal('KAFKA-PROD', `Auth event: ${payload}`, 'tag-eventsim');
+        setTimeout(() => {
+          logToTerminal('SPARK-METRIC', `Active Session updated for User #${user}`, 'tag-spark');
+        }, 250);
+      } else if (type === 'AddToPlaylist') {
+        const payload = JSON.stringify({ userId: user, page: "AddToPlaylist", song: song.title, ts: ts });
+        logToTerminal('KAFKA-PROD', `Playlist interaction: ${payload}`, 'tag-eventsim');
+        setTimeout(() => {
+          logToTerminal('SPARK-ANALYTIC', `Incremented playlist score for track '${song.title}'`, 'tag-success');
+        }, 300);
+      } else if (type === '404Error') {
+        const payload = JSON.stringify({ userId: user, page: "Error", status: 404, ts: ts });
+        logToTerminal('ALERT-ERR', `Client HTTP 404 on endpoint /stream/v1: ${payload}`, 'tag-err');
+        setTimeout(() => {
+          logToTerminal('SPARK-MONITOR', `Alert triggered: Error threshold within 1m window normal`, 'tag-spark');
+        }, 200);
+      }
+    }
+
+    // Auto-stream toggle
+    let streamInterval = null;
+    function toggleAutoStream() {
+      const btn = document.getElementById('btn-toggle-stream');
+      if (streamInterval) {
+        clearInterval(streamInterval);
+        streamInterval = null;
+        if (btn) {
+          btn.textContent = 'Bật Tự Động';
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-secondary');
+        }
+        logToTerminal('STREAM', 'Tạm dừng luồng tự động.', 'tag-kafka');
+      } else {
+        const eventTypes = ['NextSong', 'NextSong', 'NextSong', 'Login', 'AddToPlaylist', '404Error'];
+        streamInterval = setInterval(() => {
+          const randomType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+          generateEvent(randomType);
+        }, 900);
+        if (btn) {
+          btn.textContent = 'Dừng Tự Động';
+          btn.classList.remove('btn-secondary');
+          btn.classList.add('btn-primary');
+        }
+        logToTerminal('STREAM', 'Bắt đầu phát luồng sự kiện tự động mỗi 900ms...', 'tag-success');
+      }
+    }
+  </script>
+</body>
+</html>
