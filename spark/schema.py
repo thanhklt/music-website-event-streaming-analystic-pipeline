@@ -93,3 +93,10 @@ status_change_events = StructType([
     StructField("gender", StringType(), True),
     StructField("registration", LongType(), True),
 ])
+
+event_dict = {
+    "auth_events": auth_events,
+    "listen_events": listen_events,
+    "page_events": page_events,
+    "status_change_events": status_change_events
+}
