@@ -50,7 +50,7 @@ listen_events = StructType([
     StructField("registration", LongType(), True),
 ])
 
-page_events = StructType([
+page_view_events = StructType([
     StructField("ts", LongType(), True),
     StructField("sessionId", IntegerType(), True),
     StructField("page", StringType(), True),
@@ -94,9 +94,9 @@ status_change_events = StructType([
     StructField("registration", LongType(), True),
 ])
 
-event_dict = {
+EVENTS = {
     "auth_events": auth_events,
     "listen_events": listen_events,
-    "page_events": page_events,
+    "page_view_events": page_view_events,  # Kafka topic name là "page_view_events"
     "status_change_events": status_change_events
 }

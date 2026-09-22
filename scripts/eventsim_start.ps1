@@ -68,7 +68,7 @@ docker run -d `
     --growth-rate     "0" `
     --userid          "1" `
     --randomseed      "1" `
-    --continuous `
+    --nocontinuous `
     --kafkaBrokerList $KAFKA_BROKER
 
 if ($LASTEXITCODE -ne 0) {
