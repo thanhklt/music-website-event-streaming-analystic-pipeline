@@ -1,95 +1,62 @@
 import sys
 sys.stdout.reconfigure(encoding="utf-8")
 
-import findspark
-findspark.init()
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
+import os
+from dotenv import load_dotenv
 
 import schema
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-GCP_BUCKET = os.environ.get("GCP_GCS_BUCKET")
-
-# Download JAR về local: jars/gcs-connector-hadoop3-2.2.25-shaded.jar
-GCS_CONNECTOR_JAR = os.path.abspath("./jars/gcs-connector-hadoop3-2.2.25-shaded.jar")
-
-spark = (
-    SparkSession.builder
-    .appName("MusicStreaming")
-    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.13:4.2.0")
-    .config("spark.jars", GCS_CONNECTOR_JAR)
-    .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
-    .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-    # Fix NumberFormatException: GCS connector 2.2.x dùng memory string ("64m", "8m"...)
-    # Hadoop 3.5 không parse được → override bằng bytes thuần túy
-    .config("spark.hadoop.fs.gs.block.size", "67108864")    # 64MB
-    .config("spark.hadoop.fs.gs.io.buffersize", "8388608")  # 8MB — tên đúng, không có dấu chấm
-    .config("spark.sql.shuffle.partitions", "4")
-    .getOrCreate()
+from streaming_functions import (
+    create_or_get_spark_session,
+    create_kafka_read_stream,
+    parse_event,
+    create_gcs_write_stream,
 )
+
+# ──────────────────────────────────────────────
+# Config
+# ──────────────────────────────────────────────
+load_dotenv()
+
+KAFKA_ADDRESS = os.getenv("KAFKA_ADDRESS", "localhost")
+KAFKA_PORT    = os.getenv("KAFKA_PORT", "9093")
+GCP_BUCKET    = os.environ.get("GCP_GCS_BUCKET")
+
+# ──────────────────────────────────────────────
+# SparkSession
+# ──────────────────────────────────────────────
+spark = create_or_get_spark_session("MusicStreaming")
+spark.streams.resetTerminated()
 print("Khởi tạo SparkSession thành công")
 
+# ──────────────────────────────────────────────
+# Streaming pipeline: mỗi Kafka topic → GCS
+# ──────────────────────────────────────────────
+for topic, event_schema in schema.EVENTS.items():
+    print(f"INFO: Khởi động stream cho topic '{topic}'...")
 
-for event_str in schema.EVENTS:
-    print(f"INFO: Đang xử lý event: {event_str}")
-
-# Khai báo nguồn streaming Kafka
-    kafka_df = (
-        spark.readStream
-        .format("kafka")
-        .option("kafka.bootstrap.servers", "localhost:9093")
-        .option("subscribe", event_str)
-        .option("startingOffsets", "earliest") # Đọc từ đầu
-        .option("maxOffsetsPerTrigger", 10000) # Số lượng events spark được phép đọc trong 1 lần xử lý.
-        .load()
+    # 1. Đọc từ Kafka
+    kafka_df = create_kafka_read_stream(
+        spark,
+        kafka_address=KAFKA_ADDRESS,
+        kafka_port=KAFKA_PORT,
+        topic=topic,
     )
 
-# Parse json theo auth_events và giữ lại metadata để kiểm tra / truy vết
-    events_df = (
-        kafka_df
-        .select(
-            F.col("topic"),
-            F.col("partition"),
-            F.col("offset"),
-            F.col("timestamp").alias("kafka_timestamp"),
-            F.col("value").cast("string").alias("raw_json"),
-        )
-        .withColumn("event", F.from_json(F.col("raw_json"), schema.EVENTS[event_str])) # Parse Json
-        .select(
-            "topic",
-            "partition",
-            "offset",
-            "kafka_timestamp",
-            "raw_json",
-            "event.*",
-        )
-        .withColumn("ts", (F.col("ts") / 1000).cast("timestamp"))
-        .withColumn("year", F.year(F.col("ts")))
-        .withColumn("month", F.month(F.col("ts")))
-        .withColumn("day", F.dayofmonth(F.col("ts")))
-        .withColumn("hour", F.hour(F.col("ts")))
-        .withWatermark("ts", "30 minutes")
+    # 2. Parse JSON + thêm partition columns
+    parsed_df = parse_event(kafka_df, event_schema)
+
+    # 3. Ghi ra GCS (parquet, phân vùng year/month/day/hour)
+    create_gcs_write_stream(
+        df=parsed_df,
+        topic=topic,
+        bucket=GCP_BUCKET,
     )
 
+print("Tất cả streams đã khởi động. Đang lắng nghe...")
 
-
-# Xuất ra micro-batch
-    print(f"Bắt đầu lắng nghe dữ liệu từ Kafka topic '{event_str}'...")
-    q = (
-        events_df.writeStream
-        .format("json")
-        .partitionBy("year", "month", "day", "hour")
-        .outputMode("append")
-        .option("path", f"gs://{GCP_BUCKET}/{event_str}") \
-        .option("checkpointLocation", f"gs://{GCP_BUCKET}/checkpoint/{event_str}") \
-        .trigger(processingTime="10 seconds") # Nhịp chạy (có thể chờ)
-        .start()
-    )
-
-
+# ──────────────────────────────────────────────
+# Chờ cho đến khi có stream nào kết thúc hoặc lỗi
+# ──────────────────────────────────────────────
 try:
     spark.streams.awaitAnyTermination()
 except KeyboardInterrupt:
@@ -99,4 +66,3 @@ except KeyboardInterrupt:
 finally:
     spark.stop()
     print("Đã dừng SparkSession.")
-
