@@ -10,29 +10,30 @@ from pyspark.sql import functions as F
 def create_or_get_spark_session(app_name: str) -> SparkSession:
     """
     Khởi tạo hoặc lấy SparkSession hiện có.
-    GCS connector JAR + fs.gs.impl được config tại đây.
-    Các numeric overrides (block.size, buffersize) được đặt ở spark-defaults.conf.
+    HDFS native client và Kafka connector JARs được nạp tại đây.
     """
-    gcs_jar = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../jars/gcs-connector-hadoop3-latest.jar")
-    )
+    jars_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../jars"))
 
-    spark = (
+    # Liệt kê tất cả JAR trong thư mục jars/ ngoại trừ gcs-connector
+    jar_files = []
+    if os.path.exists(jars_dir):
+        jar_files = [
+            os.path.join(jars_dir, f)
+            for f in os.listdir(jars_dir)
+        ]
+    jars_str = ",".join(jar_files)
+
+    builder = (
         SparkSession.builder
         .appName(app_name)
-        .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.13:4.2.0")
-        .config("spark.jars", gcs_jar)
-        # GCS FileSystem implementation
-        .config("spark.hadoop.fs.gs.impl",
-                "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
-        .config("spark.hadoop.fs.AbstractFileSystem.gs.impl",
-                "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-        # Auth — Application Default Credentials (gcloud auth application-default login)
-        .config("spark.hadoop.google.cloud.auth.null.enable", "true")
         .config("spark.sql.shuffle.partitions", "4")
-        .getOrCreate()
+        .config("spark.hadoop.dfs.client.use.datanode.hostname", "true")
     )
-    return spark
+
+    if jars_str:
+        builder = builder.config("spark.jars", jars_str)
+
+    return builder.getOrCreate()
 
 
 # ──────────────────────────────────────────────
@@ -52,11 +53,11 @@ def create_kafka_read_stream(
 
     Parameters
     ----------
-    spark               : SparkSession hiện tại
-    kafka_address       : địa chỉ Kafka bootstrap server (e.g. "localhost")
-    kafka_port          : port Kafka (e.g. "9093")
-    topic               : tên Kafka topic
-    starting_offset     : "earliest" | "latest"
+    spark                   : SparkSession hiện tại
+    kafka_address           : địa chỉ Kafka broker (e.g. "kafka" hoặc "localhost")
+    kafka_port              : port Kafka (e.g. "9092" hoặc "9093")
+    topic                   : tên Kafka topic
+    starting_offset         : "earliest" | "latest"
     max_offsets_per_trigger : giới hạn số message mỗi micro-batch
     """
     bootstrap = f"{kafka_address}:{kafka_port}"
@@ -79,7 +80,7 @@ def create_kafka_read_stream(
 def parse_event(kafka_df, schema):
     """
     Parse raw Kafka value (bytes) thành các cột theo schema.
-    Giữ lại Kafka metadata để debug / tracing.
+    Giữ lại Kafka metadata để debug / tracing (topic, partition, offset, kafka_timestamp).
     Thêm các cột phân vùng: year, month, day, hour.
 
     Parameters
@@ -108,7 +109,7 @@ def parse_event(kafka_df, schema):
         )
         # Chuyển ts từ milliseconds → timestamp
         .withColumn("ts", (F.col("ts") / 1000).cast("timestamp"))
-        # Cột phân vùng GCS
+        # Cột phân vùng HDFS
         .withColumn("year",  F.year(F.col("ts")))
         .withColumn("month", F.month(F.col("ts")))
         .withColumn("day",   F.dayofmonth(F.col("ts")))
@@ -119,32 +120,40 @@ def parse_event(kafka_df, schema):
 
 
 # ──────────────────────────────────────────────
-# 4. GCS Write Stream
+# 4. HDFS Write Stream
 # ──────────────────────────────────────────────
 
-def create_gcs_write_stream(
+def create_hdfs_write_stream(
     df,
     topic: str,
-    bucket: str,
+    hdfs_url: str = "hdfs://namenode:9000",
+    base_path: str = "/data/events",
+    checkpoint_base: str = "/checkpoint",
     trigger_interval: str = "10 seconds",
 ):
     """
-    Ghi Structured Streaming DataFrame ra GCS dưới dạng Parquet.
+    Ghi Structured Streaming DataFrame ra HDFS dưới dạng Parquet.
     Phân vùng theo year/month/day/hour.
 
     Parameters
     ----------
     df               : parsed DataFrame từ parse_event
-    topic            : tên topic (dùng làm tên thư mục trên GCS)
-    bucket           : tên GCS bucket (không bao gồm gs://)
+    topic            : tên topic (dùng làm tên thư mục trên HDFS)
+    hdfs_url         : endpoint NameNode (ví dụ hdfs://namenode:9000 hoặc hdfs://localhost:9000)
+    base_path        : thư mục gốc chứa events (/data/events)
+    checkpoint_base  : thư mục gốc lưu checkpoint (/checkpoint)
     trigger_interval : chu kỳ trigger micro-batch
 
     Returns
     -------
-    StreamingQuery : đối tượng query (chưa block, cần awaitAnyTermination)
+    StreamingQuery   : đối tượng query (cần awaitAnyTermination)
     """
-    output_path     = f"gs://{bucket}/{topic}"
-    checkpoint_path = f"gs://{bucket}/checkpoint/{topic}"
+    hdfs_url = hdfs_url.rstrip("/")
+    base_path = base_path.strip("/")
+    checkpoint_base = checkpoint_base.strip("/")
+
+    output_path     = f"{hdfs_url}/{base_path}/{topic}"
+    checkpoint_path = f"{hdfs_url}/{checkpoint_base}/{topic}"
 
     return (
         df.writeStream

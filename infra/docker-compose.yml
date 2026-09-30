@@ -1,0 +1,134 @@
+services:
+  kafka:
+    image: apache/kafka:4.3.1
+    container_name: kafka
+    ports:
+      - "9092:9092"   # INTERNAL — cho container trong Docker network
+      - "9093:9093"   # EXTERNAL — cho host machine (localhost:9093)
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_LISTENERS: "INTERNAL://:9092,EXTERNAL://:9093,CONTROLLER://:9094"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka:9092,EXTERNAL://localhost:9093"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@localhost:9094"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - eventsim-net
+
+  namenode:
+    image: apache/hadoop:3.3.6
+    container_name: namenode
+    hostname: namenode
+    ports:
+      - "9000:9000"   # HDFS RPC
+      - "9870:9870"   # NameNode Web UI & WebHDFS
+    volumes:
+      - namenode-data:/opt/hadoop/data/nameNode
+      - ./hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ./hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+    command: >
+      bash -c "if [ ! -d /opt/hadoop/data/nameNode/current ]; then
+                 echo '=== Formatting NameNode ===';
+                 /opt/hadoop/bin/hdfs namenode -format -force;
+               fi && /opt/hadoop/bin/hdfs namenode"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9870 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - eventsim-net
+
+  datanode:
+    image: apache/hadoop:3.3.6
+    container_name: datanode
+    hostname: datanode
+    depends_on:
+      namenode:
+        condition: service_healthy
+    ports:
+      - "9864:9864"   # DataNode Web UI
+      - "9866:9866"   # DataNode Data transfer
+    volumes:
+      - datanode-data:/opt/hadoop/data/dataNode
+      - ./hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ./hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+    command: >
+      bash -c "/opt/hadoop/bin/hdfs datanode"
+    networks:
+      - eventsim-net
+
+  hue:
+    image: gethue/hue:latest
+    container_name: hue
+    hostname: hue
+    depends_on:
+      namenode:
+        condition: service_healthy
+      datanode:
+        condition: service_started
+    ports:
+      - "8888:8888"   # Hue Web UI
+    volumes:
+      - ./hue/hue.ini:/usr/share/hue/desktop/conf/z-hue.ini:ro
+    environment:
+      - HUE_IGNORE_PASSWORD_VALIDATION=true
+    networks:
+      - eventsim-net
+
+  spark-streaming:
+    image: spark-streaming:latest
+    build:
+      context: ../
+      dockerfile: infra/spark/Dockerfile
+    container_name: spark-streaming
+    hostname: spark-streaming
+    depends_on:
+      kafka:
+        condition: service_started
+      namenode:
+        condition: service_healthy
+      datanode:
+        condition: service_started
+    volumes:
+      - ../spark:/app/spark:ro
+      - ../jars:/app/jars:ro
+      - ../.env:/app/.env:ro
+    environment:
+      - KAFKA_ADDRESS=kafka
+      - KAFKA_PORT=9092
+      - HDFS_URL=hdfs://namenode:9000
+      - HDFS_BASE_PATH=/data/events
+      - HDFS_CHECKPOINT_PATH=/checkpoint
+      - OUTPUT_FORMAT=parquet
+      - PYTHONUNBUFFERED=1
+    networks:
+      - eventsim-net
+
+networks:
+  eventsim-net:
+    name: eventsim-net
+    driver: bridge
+
+volumes:
+  kafka-data:
+    name: kafka-data
+  namenode-data:
+    name: namenode-data
+  datanode-data:
+    name: datanode-data
+  hue-data:
+    name: hue-data

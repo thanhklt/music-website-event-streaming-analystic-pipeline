@@ -8,7 +8,4 @@
 
 - Hiện tại đang script đang dedupe pipeline ngay bước ingest (lý do là dedupe record trùng hoàn toàn, còn record bị trùng về nghiệp vụ sẽ được xử lý khi transform bằng dbt)
 
-# Bước 1: Login
-gcloud auth application-default login
-# Bước 2: Set project
-gcloud config set project YOUR_PROJECT_ID
+- Lỗi: Khi load events từ kafka lên hdfs
