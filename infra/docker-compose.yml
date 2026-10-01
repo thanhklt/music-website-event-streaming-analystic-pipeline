@@ -118,6 +118,25 @@ services:
     networks:
       - eventsim-net
 
+  duckdb:
+    image: duckdb/duckdb:latest
+    container_name: duckdb_analytics
+    volumes:
+      - ./duckdb/data:/workspace
+      - ./duckdb/init.sql:/init.sql:ro
+      - duckdb-data:/root/.duckdb
+    working_dir: /workspace
+    entrypoint: ["duckdb"]
+    command:
+      - "-cmd"
+      - ".read /init.sql"
+      - "warehouse.duckdb"
+    restart: unless-stopped
+    stdin_open: true # Giữ terminal mở để tương tác CLI nếu cần
+    tty: true
+    networks:
+      - eventsim-net
+
 networks:
   eventsim-net:
     name: eventsim-net
@@ -132,3 +151,5 @@ volumes:
     name: datanode-data
   hue-data:
     name: hue-data
+  duckdb-data:
+    name: duckdb-data
