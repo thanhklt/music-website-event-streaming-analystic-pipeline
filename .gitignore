@@ -6,4 +6,6 @@ data/
 .vscode/
 checkpoints/
 .env/
-jars/
+jars/
+infra/duckdb/data/
+*.duckdb.wal
