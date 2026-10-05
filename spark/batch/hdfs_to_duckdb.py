@@ -296,7 +296,7 @@ def write_to_duckdb(
                 con.execute(f"""
                     INSERT INTO {table_name} BY NAME 
                     SELECT * 
-                    FROM read_parquet(?::VARCHAR[], hive_partitioning=true, union_by_name=true);
+                    FROM read_parquet(?::VARCHAR[], hive_partitioning=false, union_by_name=true);
                 """, [local_paths])
 
                 # 4. Đếm số dòng sau khi nạp để tính chênh lệch

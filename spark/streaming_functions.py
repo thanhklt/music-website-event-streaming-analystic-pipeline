@@ -158,7 +158,7 @@ def create_hdfs_write_stream(
     return (
         df.writeStream
         .format("parquet")
-        .partitionBy("year", "month", "day", "hour")
+        .partitionBy("year", "month", "day")
         .outputMode("append")
         .option("path", output_path)
         .option("checkpointLocation", checkpoint_path)

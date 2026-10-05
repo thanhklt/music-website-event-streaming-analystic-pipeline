@@ -36,24 +36,6 @@ HDFS lưu data lake; DuckDB là nơi phục vụ truy vấn phân tích; dbt th�
 5. Kiểm tra tài liệu chính thức khi API hoặc khả năng tích hợp chưa chắc chắn. Không viết cấu hình theo suy đoán; pin phiên bản tương thích của Spark, Kafka connector, Hadoop, Java, DuckDB, dbt-core và dbt-duckdb.
 6. Không báo “đã chạy thành công” khi chỉ đọc code. Nêu rõ bước đã chạy, kết quả và bước bị chặn bởi môi trường.
 
-## Cấu trúc đề xuất
-
-Giữ cấu trúc hiện có nếu phù hợp. Với repository mới, có thể dùng:
-
-```text
-infra/                  # Docker Compose và cấu hình Kafka/HDFS
-src/producer/           # Đọc source, phát event
-src/streaming/          # Spark Structured Streaming
-src/ingestion/          # Chuyển dữ liệu HDFS vào DuckDB
-dbt/                    # dbt_project.yml, models, tests, macros
-dashboard/              # Ứng dụng dashboard
-tests/                  # Unit/integration tests và fixtures
-scripts/                # Bootstrap, smoke test và vận hành
-docs/                   # Kiến trúc, data contract, runbook
-.env.example            # Biến cấu hình mẫu, không chứa secret
-README.md               # Hướng dẫn chạy từ đầu
-```
-
 ## Source → Kafka
 
 - Xác định data contract: tên trường, kiểu dữ liệu, nullability, business key, event ID, event time và timezone. Dùng UTC trong pipeline.
@@ -130,3 +112,4 @@ README.md               # Hướng dẫn chạy từ đầu
 ## Báo cáo cuối mỗi nhiệm vụ
 
 Trả lời bằng tiếng Việt, ngắn gọn: thay đổi gì, lý do, các bước đã kiểm chứng và kết quả, hạn chế hoặc blockers. Liệt kê file quan trọng để review. Nêu rõ **chưa commit và chưa push**. Không yêu cầu commit/push như một bước bắt buộc để hoàn tất nhiệm vụ.
+
