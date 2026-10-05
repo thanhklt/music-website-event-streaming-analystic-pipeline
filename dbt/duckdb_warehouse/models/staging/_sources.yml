@@ -1,0 +1,21 @@
+version: 2
+
+sources:
+  - name: landing
+    description: Dữ liệu thô được ingestion từ HDFS vào DuckDB.
+    schema: landing
+    tables:
+      - name: auth_events
+        description: Các sự kiện xác thực người dùng.
+
+      - name: listen_events
+        description: Các sự kiện nghe bài hát.
+
+      - name: page_view_events
+        description: Các sự kiện xem trang.
+
+      - name: status_change_events
+        description: Các sự kiện thay đổi trạng thái hoặc cấp độ tài khoản.
+
+      - name: ingestion_ledger
+        description: Nhật ký các file HDFS đã được nạp vào DuckDB.
