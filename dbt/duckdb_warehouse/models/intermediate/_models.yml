@@ -1,0 +1,279 @@
+version: 2
+
+models:
+  - name: int_dim_user
+    description: Lịch sử thuộc tính người dùng theo SCD Type 2.
+    data_tests:
+      - dbt_expectations.expect_compound_columns_to_be_unique:
+          arguments:
+            column_list: [user_id, start_time]
+    columns:
+      - name: user_key
+        description: Khóa hash dbt_utils.generate_surrogate_key từ (user_id, start_time), phân biệt từng phiên bản SCD2.
+        data_tests: [not_null, unique]
+      - name: user_id
+        description: Khóa nghiệp vụ người dùng từ source.
+        data_tests: [not_null]
+      - name: user_last_name
+        description: Họ của người dùng trong khoảng hiệu lực.
+      - name: user_first_name
+        description: Tên của người dùng trong khoảng hiệu lực.
+      - name: user_gender
+        description: Giới tính của người dùng trong khoảng hiệu lực.
+      - name: registered_at
+        description: Thời điểm đăng ký tài khoản.
+      - name: start_time
+        description: Bắt đầu khoảng hiệu lực, bao gồm giá trị này.
+        data_tests: [not_null]
+      - name: end_time
+        description: Kết thúc khoảng hiệu lực, không bao gồm giá trị này.
+        data_tests: [not_null]
+      - name: is_active
+        description: Đánh dấu phiên bản hiện hành.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+                quote: false
+
+  - name: int_dim_session
+    description: Một dòng cho mỗi session của một người dùng.
+    data_tests:
+      - dbt_expectations.expect_compound_columns_to_be_unique:
+          arguments:
+            column_list: [user_id, session_id]
+    columns:
+      - name: session_key
+        description: Khóa hash dbt_utils.generate_surrogate_key từ (user_id, session_id).
+        data_tests: [not_null, unique]
+      - name: user_id
+        description: Khóa nghiệp vụ người dùng.
+        data_tests: [not_null]
+      - name: session_id
+        description: Mã session từ source.
+        data_tests: [not_null]
+      - name: session_started_at
+        description: Event time nhỏ nhất của user-session.
+        data_tests: [not_null]
+      - name: session_number
+        description: Thứ tự session của người dùng, bắt đầu từ 1.
+        data_tests: [not_null]
+
+  - name: int_dim_song
+    description: Một dòng cho mỗi tổ hợp nghệ sĩ, bài hát và độ dài.
+    data_tests:
+      - dbt_expectations.expect_compound_columns_to_be_unique:
+          arguments:
+            column_list: [song_artist_name, song_name, song_duration_seconds]
+    columns:
+      - name: song_key
+        description: Khóa hash dbt_utils.generate_surrogate_key từ (song_artist_name, song_name, song_duration_seconds).
+        data_tests: [not_null, unique]
+      - name: song_artist_name
+        description: Tên nghệ sĩ.
+        data_tests: [not_null]
+      - name: song_name
+        description: Tên bài hát.
+        data_tests: [not_null]
+      - name: song_duration_seconds
+        description: Độ dài bài hát theo source, tính bằng giây.
+        data_tests: [not_null]
+
+  - name: int_dim_location
+    description: Một dòng cho mỗi tổ hợp đầy đủ của thuộc tính vị trí.
+    data_tests:
+      - dbt_expectations.expect_compound_columns_to_be_unique:
+          arguments:
+            column_list:
+              - location_city
+              - location_zip
+              - location_state
+              - location_lon
+              - location_lat
+    columns:
+      - name: location_key
+        description: Khóa hash dbt_utils.generate_surrogate_key từ (location_city, location_zip, location_state, location_lon, location_lat).
+        data_tests: [not_null, unique]
+      - name: location_city
+        description: Thành phố.
+        data_tests: [not_null]
+      - name: location_zip
+        description: ZIP code.
+        data_tests: [not_null]
+      - name: location_state
+        description: Mã bang.
+        data_tests: [not_null]
+      - name: location_lon
+        description: Kinh độ.
+        data_tests: [not_null]
+      - name: location_lat
+        description: Vĩ độ.
+        data_tests: [not_null]
+
+  - name: int_dim_date
+    description: Các ngày UTC xuất hiện trong listen events, theo lịch ISO.
+    columns:
+      - name: date_key
+        description: Ngày UTC của lượt nghe.
+        data_tests: [not_null, unique]
+      - name: day_of_week
+        description: Thứ ISO từ 1 (Thứ Hai) đến 7 (Chủ Nhật).
+        data_tests: [not_null]
+      - name: day_name
+        description: Tên thứ bằng tiếng Anh.
+        data_tests: [not_null]
+      - name: day_of_month
+        description: Ngày trong tháng.
+        data_tests: [not_null]
+      - name: day_of_year
+        description: Ngày trong năm.
+        data_tests: [not_null]
+      - name: week_of_year
+        description: Tuần ISO trong năm.
+        data_tests: [not_null]
+      - name: iso_year_number
+        description: Năm ISO.
+        data_tests: [not_null]
+      - name: month_number
+        description: Số tháng.
+        data_tests: [not_null]
+      - name: month_name
+        description: Tên tháng bằng tiếng Anh.
+        data_tests: [not_null]
+      - name: quarter_number
+        description: Số quý.
+        data_tests: [not_null]
+      - name: year_number
+        description: Năm dương lịch.
+        data_tests: [not_null]
+      - name: is_weekend
+        description: Thứ Bảy hoặc Chủ Nhật theo ISO.
+        data_tests: [not_null]
+
+  - name: int_dim_time
+    description: Các thời điểm UTC đến giây xuất hiện trong listen events.
+    columns:
+      - name: time_key
+        description: Thời gian UTC ở grain HH:MM:SS.
+        data_tests: [not_null, unique]
+      - name: hour_number
+        description: Giờ 24h.
+        data_tests: [not_null]
+      - name: minute_number
+        description: Phút trong giờ.
+        data_tests: [not_null]
+      - name: second_number
+        description: Giây trong phút.
+        data_tests: [not_null]
+      - name: hour_12
+        description: Giờ 12h.
+        data_tests: [not_null]
+      - name: am_pm
+        description: Ký hiệu AM hoặc PM.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [AM, PM]
+      - name: minute_of_day
+        description: Số phút từ đầu ngày.
+        data_tests: [not_null]
+      - name: second_of_day
+        description: Số giây từ đầu ngày.
+        data_tests: [not_null]
+      - name: time_period
+        description: Night, Morning, Afternoon hoặc Evening theo giờ UTC.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [Night, Morning, Afternoon, Evening]
+
+  - name: int_fact_song_play
+    description: Một dòng cho mỗi lượt nghe, đã lookup khóa surrogate dimension.
+    data_tests:
+      - dbt_expectations.expect_compound_columns_to_be_unique:
+          arguments:
+            column_list: [user_id, session_id, item_in_session]
+      - dbt_expectations.expect_compound_columns_to_be_unique:
+          arguments:
+            column_list: [user_key, session_key, song_position_in_session]
+    columns:
+      - name: play_key
+        description: Khóa hash dbt_utils.generate_surrogate_key từ (user_id, session_id, item_in_session).
+        data_tests: [not_null, unique]
+      - name: user_id
+        description: Khóa nghiệp vụ kỹ thuật để giữ play_key qua rerun.
+        data_tests: [not_null]
+      - name: session_id
+        description: Mã session kỹ thuật để giữ play_key qua rerun.
+        data_tests: [not_null]
+      - name: item_in_session
+        description: Thứ tự event nguồn trong session.
+        data_tests: [not_null]
+      - name: user_key
+        description: Khóa phiên bản user có hiệu lực tại thời điểm nghe.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_dim_user')
+                field: user_key
+      - name: song_key
+        description: Khóa bài hát.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_dim_song')
+                field: song_key
+      - name: session_key
+        description: Khóa session.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_dim_session')
+                field: session_key
+      - name: location_key
+        description: Khóa vị trí.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_dim_location')
+                field: location_key
+      - name: play_date_key
+        description: Khóa ngày UTC.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_dim_date')
+                field: date_key
+      - name: play_time_key
+        description: Khóa timestamp UTC lấy từ int_dim_time.time_key, giữ nguyên độ chính xác của event.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_dim_time')
+                field: time_key
+      - name: play_started_at
+        description: Thời điểm bắt đầu nghe.
+        data_tests: [not_null]
+      - name: play_ended_at
+        description: Thời điểm event kế tiếp trong user-session; có thể null.
+      - name: listened_seconds
+        description: Số giây từ bắt đầu nghe đến event kế tiếp; có thể null.
+      - name: song_position_in_session
+        description: Thứ tự lượt nghe trong session, bắt đầu từ 1.
+        data_tests: [not_null]
+      - name: user_level_at_play
+        description: Gói tài khoản tại thời điểm nghe.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [free, paid]
