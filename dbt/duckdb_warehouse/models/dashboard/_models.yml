@@ -1,0 +1,76 @@
+version: 2
+
+models:
+  - name: song_plays
+    description: 'Pre-joined play events for dashboard reporting, materialized at one row per play_key.'
+    columns:
+      - name: play_key
+        description: 'Primary key preserved from fact_song_play.'
+        data_tests:
+          - not_null
+          - unique
+      - name: user_id
+        description: 'User ID preserved from fact_song_play; nullable.'
+      - name: song_key
+        description: 'Foreign key to dim_song preserved from fact_song_play.'
+        data_tests:
+          - not_null
+      - name: location_key
+        description: 'Foreign key to dim_location preserved from fact_song_play.'
+        data_tests:
+          - not_null
+      - name: play_started_at
+        description: 'UTC timestamp of play start; nullable for events missing timestamp.'
+      - name: listened_seconds
+        description: 'Listened duration in seconds; nullable and preserves 0.'
+      - name: state
+        description: 'Normalized state name from dim_location or Unknown.'
+        data_tests:
+          - not_null
+      - name: gender
+        description: 'Normalized gender from dim_user SCD2 version at play time or Unknown.'
+        data_tests:
+          - not_null
+      - name: song
+        description: 'Normalized song title from dim_song or Unknown.'
+        data_tests:
+          - not_null
+      - name: artist
+        description: 'Normalized artist name from dim_song or Unknown.'
+        data_tests:
+          - not_null
+      - name: play_date
+        description: 'Date cast from play_started_at; NULL when timestamp is NULL.'
+      - name: weekday
+        description: 'ISO weekday (1=Monday .. 7=Sunday); NULL when timestamp is NULL.'
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6, 7]
+      - name: hour
+        description: 'Hour of day in UTC (0..23); NULL when timestamp is NULL.'
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+      - name: updated_time
+        description: 'Audit timestamp from fact_song_play.'
+        data_tests:
+          - not_null
+
+  - name: filter_options
+    description: 'Distinct dropdown filter options extracted from full dimensions.'
+    columns:
+      - name: filter_name
+        description: 'Category of the filter (states or genders).'
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - states
+                  - genders
+      - name: filter_value
+        description: 'Distinct normalized value for the filter.'
+        data_tests:
+          - not_null

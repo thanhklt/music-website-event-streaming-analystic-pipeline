@@ -20,6 +20,8 @@ models:
         description: Tên của người dùng trong khoảng hiệu lực.
       - name: user_gender
         description: Giới tính của người dùng trong khoảng hiệu lực.
+      - name: user_agent
+        description: User agent từ sự kiện nguồn trong khoảng hiệu lực; thay đổi giá trị tạo phiên bản SCD2 mới.
       - name: registered_at
         description: Thời điểm đăng ký tài khoản.
       - name: start_time
@@ -42,7 +44,7 @@ models:
     data_tests:
       - dbt_expectations.expect_compound_columns_to_be_unique:
           arguments:
-            column_list: [user_id, session_id]
+            column_list: [user_id, session_id, session_started_time]
     columns:
       - name: session_key
         description: Khóa hash dbt_utils.generate_surrogate_key từ (user_id, session_id).
@@ -53,7 +55,7 @@ models:
       - name: session_id
         description: Mã session từ source.
         data_tests: [not_null]
-      - name: session_started_at
+      - name: session_started_time
         description: Event time nhỏ nhất của user-session.
         data_tests: [not_null]
       - name: session_number
@@ -155,8 +157,11 @@ models:
     description: Các thời điểm UTC đến giây xuất hiện trong listen events.
     columns:
       - name: time_key
-        description: Thời gian UTC ở grain HH:MM:SS.
+        description: Khóa INTEGER bằng số giây từ 00:00:00 UTC, từ 0 đến 86399.
         data_tests: [not_null, unique]
+      - name: time_value
+        description: Giờ UTC kiểu TIME theo grain giây; cắt phần lẻ, không làm tròn.
+        data_tests: [not_null]
       - name: hour_number
         description: Giờ 24h.
         data_tests: [not_null]
@@ -191,14 +196,11 @@ models:
                 values: [Night, Morning, Afternoon, Evening]
 
   - name: int_fact_song_play
-    description: Một dòng cho mỗi lượt nghe, đã lookup khóa surrogate dimension.
+    description: Một dòng cho mỗi lượt nghe từ listen_events; LEFT JOIN giữ business key nguồn và để khóa ngoại NULL khi thiếu dimension.
     data_tests:
       - dbt_expectations.expect_compound_columns_to_be_unique:
           arguments:
             column_list: [user_id, session_id, item_in_session]
-      - dbt_expectations.expect_compound_columns_to_be_unique:
-          arguments:
-            column_list: [user_key, session_key, song_position_in_session]
     columns:
       - name: play_key
         description: Khóa hash dbt_utils.generate_surrogate_key từ (user_id, session_id, item_in_session).
@@ -215,7 +217,6 @@ models:
       - name: user_key
         description: Khóa phiên bản user có hiệu lực tại thời điểm nghe.
         data_tests:
-          - not_null
           - relationships:
               arguments:
                 to: ref('int_dim_user')
@@ -223,15 +224,13 @@ models:
       - name: song_key
         description: Khóa bài hát.
         data_tests:
-          - not_null
           - relationships:
               arguments:
                 to: ref('int_dim_song')
                 field: song_key
       - name: session_key
-        description: Khóa session.
+        description: Khóa event trong dimension session, lookup bằng user_id, session_id, timestamp và itemInSession; có thể NULL.
         data_tests:
-          - not_null
           - relationships:
               arguments:
                 to: ref('int_dim_session')
@@ -239,7 +238,6 @@ models:
       - name: location_key
         description: Khóa vị trí.
         data_tests:
-          - not_null
           - relationships:
               arguments:
                 to: ref('int_dim_location')
@@ -247,15 +245,13 @@ models:
       - name: play_date_key
         description: Khóa ngày UTC.
         data_tests:
-          - not_null
           - relationships:
               arguments:
                 to: ref('int_dim_date')
                 field: date_key
       - name: play_time_key
-        description: Khóa timestamp UTC lấy từ int_dim_time.time_key, giữ nguyên độ chính xác của event.
+        description: Khóa INTEGER số giây từ đầu ngày lấy từ int_dim_time; timestamp đầy đủ vẫn ở play_started_at.
         data_tests:
-          - not_null
           - relationships:
               arguments:
                 to: ref('int_dim_time')
@@ -264,16 +260,6 @@ models:
         description: Thời điểm bắt đầu nghe.
         data_tests: [not_null]
       - name: play_ended_at
-        description: Thời điểm event kế tiếp trong user-session; có thể null.
+        description: Timestamp UTC của event tiếp theo trong cùng user/session trên timeline hợp nhất listen_events và page_view_events, sắp xếp theo ts rồi itemInSession; NULL nếu là event cuối.
       - name: listened_seconds
-        description: Số giây từ bắt đầu nghe đến event kế tiếp; có thể null.
-      - name: song_position_in_session
-        description: Thứ tự lượt nghe trong session, bắt đầu từ 1.
-        data_tests: [not_null]
-      - name: user_level_at_play
-        description: Gói tài khoản tại thời điểm nghe.
-        data_tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: [free, paid]
+        description: Chênh lệch play_ended_at trừ play_started_at theo giây, giữ phần lẻ; NULL khi không có event tiếp theo. Có thể bằng 0 hoặc lớn hơn duration bài hát, không áp dụng giới hạn thời lượng hay timeout.

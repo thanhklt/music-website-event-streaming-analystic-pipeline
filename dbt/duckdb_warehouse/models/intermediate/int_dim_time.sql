@@ -11,14 +11,14 @@ WITH int_dim_time__source AS (
 
 int_dim_time__retrieve AS (
     SELECT
-        ts
+        DISTINCT DATE_TRUNC('second', ts) AS ts
     FROM 
         int_dim_time__source
 ),
 
 int_dim_time__get_hour_minute_second AS (
     SELECT
-        ts AS time_key,
+        CAST(ts AS TIME) AS time_value,
         CAST(EXTRACT(HOUR FROM ts) AS INTEGER) AS hour_number,
         CAST(EXTRACT(MINUTE FROM ts) AS INTEGER) AS minute_number,
         CAST(EXTRACT(SECOND FROM ts) AS INTEGER) AS second_number
@@ -28,7 +28,8 @@ int_dim_time__get_hour_minute_second AS (
 
 int_dim_time__get_other_attributes AS (
     SELECT
-        time_key,
+        CAST(hour_number * 3600 + minute_number * 60 + second_number AS INTEGER) AS time_key,
+        time_value,
         hour_number,
         minute_number,
         second_number,
@@ -49,4 +50,4 @@ int_dim_time__get_other_attributes AS (
         int_dim_time__get_hour_minute_second
 )
 
-SELECT * FROM int_dim_time__get_other_attributes
+SELECT DISTINCT * FROM int_dim_time__get_other_attributes

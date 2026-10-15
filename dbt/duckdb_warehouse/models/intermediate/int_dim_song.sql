@@ -10,7 +10,7 @@ WITH int_dim_song__source AS (
 ),
 
 int_dim_song__retrieve AS (
-    SELECT
+    SELECT DISTINCT
         artist,
         song,
         duration

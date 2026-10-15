@@ -1,144 +1,143 @@
-{{ config(
+﻿{{ config(
     materialized='table',
     unique_key=['user_id', 'session_id', 'item_in_session']
 ) }}
 
 WITH int_fact_song_play__source AS (
-    SELECT
-        ts,
-        sessionId,
-        page,
-        level,
-        itemInSession,
-        city,
-        zip,
-        state,
-        lon,
-        lat,
-        userId,
-        artist,
-        song,
-        duration
-    FROM {{ ref('stg_page_view_events') }}
+    SELECT * FROM {{ ref('stg_listen_events') }}
 ),
 
 int_fact_song_play__timeline AS (
+    SELECT userId, sessionId, ts, itemInSession
+    FROM int_fact_song_play__source
+
+    UNION
+
+    SELECT userId, sessionId, ts, itemInSession
+    FROM {{ ref('stg_page_view_events') }}
+),
+
+int_fact_song_play__timeline_conflicts AS (
+    SELECT userId, sessionId, itemInSession
+    FROM int_fact_song_play__timeline
+    GROUP BY userId, sessionId, itemInSession
+    HAVING COUNT(*) > 1
+),
+
+int_fact_song_play__timeline_check AS (
+    SELECT
+        CASE
+            WHEN COUNT(*) > 0 THEN error('Conflicting event timestamps in play timeline')
+            ELSE TRUE
+        END AS is_valid
+    FROM int_fact_song_play__timeline_conflicts
+),
+
+int_fact_song_play__next_event AS (
     SELECT
         *,
         LEAD(ts) OVER (
             PARTITION BY userId, sessionId
             ORDER BY ts, itemInSession
-        ) AS next_event_at
-    FROM int_fact_song_play__source
-),
-
-int_fact_song_play__plays AS (
-    SELECT
-        userId AS user_id,
-        sessionId AS session_id,
-        itemInSession AS item_in_session,
-        artist AS song_artist_name,
-        song AS song_name,
-        duration AS song_duration_seconds,
-        city AS location_city,
-        zip AS location_zip,
-        state AS location_state,
-        lon AS location_lon,
-        lat AS location_lat,
-        CAST(ts AS DATE) AS play_date_key,
-        ts AS play_started_at,
-        next_event_at AS play_ended_at,
-        DATE_DIFF('millisecond', ts, next_event_at) / 1000.0 AS listened_seconds,
-        CAST(
-            ROW_NUMBER() OVER (
-                PARTITION BY userId, sessionId
-                ORDER BY ts, itemInSession
-            ) AS INTEGER
-        ) AS song_position_in_session,
-        level AS user_level_at_play
+        ) AS play_ended_at
     FROM int_fact_song_play__timeline
-    WHERE page = 'NextSong'
 ),
 
--- Song and time dimensions currently retain repeated source observations.
--- Collapse identical lookup rows so a play is not multiplied by the joins.
-int_fact_song_play__song_lookup AS (
-    SELECT DISTINCT
-        song_key,
-        song_artist_name,
-        song_name,
-        song_duration_seconds
+int_fact_song_play__columns AS (
+    SELECT
+        play.ts, play.city, play.zip, play.state, play.lon, play.lat,
+        play.userId, play.artist, play.song, play.duration, play.sessionId, play.itemInSession,
+        event.play_ended_at
+    FROM int_fact_song_play__source AS play
+    LEFT JOIN int_fact_song_play__next_event AS event
+        ON play.userId = event.userId
+        AND play.sessionId = event.sessionId
+        AND play.ts = event.ts
+        AND play.itemInSession = event.itemInSession
+    CROSS JOIN int_fact_song_play__timeline_check AS timeline_check
+    WHERE timeline_check.is_valid
+),
+
+int_dim_date__source AS (
+    SELECT DISTINCT date_key FROM {{ ref('int_dim_date') }}
+),
+
+int_dim_time__source AS (
+    SELECT DISTINCT time_key FROM {{ ref('int_dim_time') }}
+),
+
+int_dim_user__source AS (
+    SELECT DISTINCT user_key, user_id, start_time, end_time
+    FROM {{ ref('int_dim_user') }}
+),
+
+int_dim_song__source AS (
+    SELECT DISTINCT song_key, song_artist_name, song_name, song_duration_seconds
     FROM {{ ref('int_dim_song') }}
 ),
 
-int_fact_song_play__session_lookup AS (
+int_dim_location__source AS (
     SELECT DISTINCT
-        session_key,
-        user_id,
-        session_id,
-        session_started_time
+        location_key, location_city, location_zip, location_state, location_lon, location_lat
+    FROM {{ ref('int_dim_location') }}
+),
+
+int_dim_session__source AS (
+    SELECT DISTINCT session_key, user_id, session_id, session_started_time, session_number
     FROM {{ ref('int_dim_session') }}
 ),
 
-int_fact_song_play__time_lookup AS (
-    SELECT DISTINCT time_key
-    FROM {{ ref('int_dim_time') }}
+int_fact_song_play__retrieve AS (
+    SELECT
+        play.userId AS user_id,
+        play.sessionId AS session_id,
+        play.itemInSession AS item_in_session,
+        usr.user_key,
+        song.song_key,
+        session.session_key,
+        location.location_key,
+        date.date_key AS play_date_key,
+        time.time_key AS play_time_key,
+        play.ts AS play_started_at,
+        play.play_ended_at,
+        EPOCH(play.play_ended_at - play.ts) AS listened_seconds
+    FROM int_fact_song_play__columns AS play
+    LEFT JOIN int_dim_date__source AS date
+        ON CAST(play.ts AS DATE) = date.date_key
+    LEFT JOIN int_dim_time__source AS time
+        ON CAST(
+            EXTRACT(HOUR FROM play.ts) * 3600
+            + EXTRACT(MINUTE FROM play.ts) * 60
+            + EXTRACT(SECOND FROM DATE_TRUNC('second', play.ts))
+            AS INTEGER
+        ) = time.time_key
+    LEFT JOIN int_dim_user__source AS usr
+        ON play.userId = usr.user_id
+        AND play.ts >= usr.start_time
+        AND play.ts < usr.end_time
+    LEFT JOIN int_dim_song__source AS song
+        ON play.artist IS NOT DISTINCT FROM song.song_artist_name
+        AND play.song IS NOT DISTINCT FROM song.song_name
+        AND play.duration IS NOT DISTINCT FROM song.song_duration_seconds
+    LEFT JOIN int_dim_location__source AS location
+        ON play.city IS NOT DISTINCT FROM location.location_city
+        AND play.zip IS NOT DISTINCT FROM location.location_zip
+        AND play.state IS NOT DISTINCT FROM location.location_state
+        AND play.lon IS NOT DISTINCT FROM location.location_lon
+        AND play.lat IS NOT DISTINCT FROM location.location_lat
+    LEFT JOIN int_dim_session__source AS session
+        ON play.userId = session.user_id
+        AND play.sessionId = session.session_id
+        AND play.ts = session.session_started_time
+        AND play.itemInSession = session.session_number
 ),
 
-int_fact_song_play__dimension_keys AS (
+int_fact_song_play__gen_key AS (
     SELECT
-        plays.*,
-        users.user_key,
-        songs.song_key,
-        sessions.session_key,
-        locations.location_key,
-        dates.date_key AS resolved_date_key,
-        times.time_key AS resolved_time_key
-    FROM int_fact_song_play__plays AS plays
-    LEFT JOIN {{ ref('int_dim_user') }} AS users
-        ON plays.user_id = users.user_id
-       AND plays.play_started_at >= users.start_time
-       AND plays.play_started_at < users.end_time
-    LEFT JOIN int_fact_song_play__song_lookup AS songs
-        ON plays.song_artist_name IS NOT DISTINCT FROM songs.song_artist_name
-       AND plays.song_name IS NOT DISTINCT FROM songs.song_name
-       AND plays.song_duration_seconds IS NOT DISTINCT FROM songs.song_duration_seconds
-    LEFT JOIN int_fact_song_play__session_lookup AS sessions
-        ON plays.user_id = sessions.user_id
-       AND plays.session_id = sessions.session_id
-       AND plays.play_started_at = sessions.session_started_time
-    LEFT JOIN {{ ref('int_dim_location') }} AS locations
-        ON plays.location_city IS NOT DISTINCT FROM locations.location_city
-       AND plays.location_zip IS NOT DISTINCT FROM locations.location_zip
-       AND plays.location_state IS NOT DISTINCT FROM locations.location_state
-       AND plays.location_lon IS NOT DISTINCT FROM locations.location_lon
-       AND plays.location_lat IS NOT DISTINCT FROM locations.location_lat
-    LEFT JOIN {{ ref('int_dim_date') }} AS dates
-        ON plays.play_date_key = dates.date_key
-    LEFT JOIN int_fact_song_play__time_lookup AS times
-        ON plays.play_started_at = times.time_key
-),
-
-int_fact_song_play__with_key AS (
-    SELECT
-        {{ dbt_utils.generate_surrogate_key([
-            'user_id', 'session_id', 'item_in_session'
-        ]) }} AS play_key,
-        fact.user_id,
-        fact.session_id,
-        fact.item_in_session,
-        fact.user_key,
-        fact.song_key,
-        fact.session_key,
-        fact.location_key,
-        fact.resolved_date_key AS play_date_key,
-        fact.resolved_time_key AS play_time_key,
-        fact.play_started_at,
-        fact.play_ended_at,
-        fact.listened_seconds,
-        fact.song_position_in_session,
-        fact.user_level_at_play
-    FROM int_fact_song_play__dimension_keys AS fact
+        {{ dbt_utils.generate_surrogate_key(['user_id', 'session_id', 'item_in_session']) }}
+         AS play_key,
+        *
+    FROM int_fact_song_play__retrieve
 )
 
-SELECT * FROM int_fact_song_play__with_key
+SELECT * FROM int_fact_song_play__gen_key

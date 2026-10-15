@@ -47,3 +47,6 @@ models:
     marts:
       +schema: marts
       +materialized: table
+    dashboard:
+      +schema: dashboard
+      +materialized: table

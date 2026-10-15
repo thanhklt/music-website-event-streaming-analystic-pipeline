@@ -1,0 +1,439 @@
+version: 2
+models:
+- name: dim_user
+  description: 'dim_user: distinct source dimension rows plus one Unknown row; table rebuild with UTC build audit.'
+  columns:
+  - name: user_key
+    description: 'user_key: VARCHAR; source key preserved; reserved Unknown key ''-1'''
+    data_tests:
+    - not_null
+    - unique
+  - name: user_id
+    description: 'user_id: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: user_last_name
+    description: 'user_last_name: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: user_first_name
+    description: 'user_first_name: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: user_gender
+    description: 'user_gender: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: registered_at
+    description: 'registered_at: TIMESTAMP; source value; NULL uses typed Unknown default TIMESTAMP ''1970-01-01 00:00:00'''
+    data_tests:
+    - not_null
+  - name: user_agent
+    description: 'user_agent: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: start_time
+    description: 'start_time: TIMESTAMP; source value; NULL uses typed Unknown default TIMESTAMP ''1970-01-01 00:00:00'''
+    data_tests:
+    - not_null
+  - name: end_time
+    description: 'end_time: TIMESTAMP; source value; NULL uses typed Unknown default TIMESTAMP ''1970-01-01 00:00:00'''
+    data_tests:
+    - not_null
+  - name: is_active
+    description: 'is_active: BOOLEAN; source value; NULL uses typed Unknown default FALSE'
+    data_tests:
+    - not_null
+  - &id001
+    name: inserted_time
+    description: UTC timestamp of this row load; refreshed for changed incremental rows.
+    data_tests:
+    - not_null
+  - &id002
+    name: inserted_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+  - &id003
+    name: updated_time
+    description: UTC timestamp, equal to inserted_time for this row load.
+    data_tests:
+    - not_null
+  - &id004
+    name: updated_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+- name: dim_song
+  description: 'dim_song: distinct source dimension rows plus one Unknown row; table rebuild with UTC build audit.'
+  columns:
+  - name: song_key
+    description: 'song_key: VARCHAR; source key preserved; reserved Unknown key ''-1'''
+    data_tests:
+    - not_null
+    - unique
+  - name: song_name
+    description: 'song_name: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: song_artist_name
+    description: 'song_artist_name: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: song_duration_seconds
+    description: 'song_duration_seconds: DECIMAL(18,3); source value; NULL uses typed Unknown default CAST(-1 AS DECIMAL(18,3))'
+    data_tests:
+    - not_null
+  - name: inserted_time
+    description: UTC timestamp of this row load; refreshed for changed incremental rows.
+    data_tests:
+    - not_null
+  - name: inserted_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+  - name: updated_time
+    description: UTC timestamp, equal to inserted_time for this row load.
+    data_tests:
+    - not_null
+  - name: updated_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+- name: dim_session
+  description: 'dim_session: distinct source dimension rows plus one Unknown row; table rebuild with UTC build audit.'
+  columns:
+  - name: session_key
+    description: 'session_key: VARCHAR; source key preserved; reserved Unknown key ''-1'''
+    data_tests:
+    - not_null
+    - unique
+  - name: session_id
+    description: 'session_id: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: user_id
+    description: 'user_id: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: session_started_time
+    description: 'session_started_time: TIMESTAMP; source value; NULL uses typed Unknown default TIMESTAMP ''1970-01-01 00:00:00'''
+    data_tests:
+    - not_null
+  - name: session_number
+    description: 'session_number: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: inserted_time
+    description: UTC timestamp of this row load; refreshed for changed incremental rows.
+    data_tests:
+    - not_null
+  - name: inserted_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+  - name: updated_time
+    description: UTC timestamp, equal to inserted_time for this row load.
+    data_tests:
+    - not_null
+  - name: updated_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+- name: dim_location
+  description: 'dim_location: distinct source dimension rows plus one Unknown row; table rebuild with UTC build audit.'
+  columns:
+  - name: location_key
+    description: 'location_key: VARCHAR; source key preserved; reserved Unknown key ''-1'''
+    data_tests:
+    - not_null
+    - unique
+  - name: location_city
+    description: 'location_city: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: location_zip
+    description: 'location_zip: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: location_state
+    description: 'location_state: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: location_lon
+    description: 'location_lon: DECIMAL(18,3); source value; NULL uses typed Unknown default CAST(-1 AS DECIMAL(18,3))'
+    data_tests:
+    - not_null
+  - name: location_lat
+    description: 'location_lat: DECIMAL(18,3); source value; NULL uses typed Unknown default CAST(-1 AS DECIMAL(18,3))'
+    data_tests:
+    - not_null
+  - name: inserted_time
+    description: UTC timestamp of this row load; refreshed for changed incremental rows.
+    data_tests:
+    - not_null
+  - name: inserted_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+  - name: updated_time
+    description: UTC timestamp, equal to inserted_time for this row load.
+    data_tests:
+    - not_null
+  - name: updated_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+- name: dim_date
+  description: 'dim_date: distinct source dimension rows plus one Unknown row; table rebuild with UTC build audit.'
+  columns:
+  - name: date_key
+    description: 'date_key: DATE; source key preserved; reserved Unknown key DATE ''1970-01-01'''
+    data_tests:
+    - not_null
+    - unique
+  - name: day_of_week
+    description: 'day_of_week: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: day_name
+    description: 'day_name: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: day_of_month
+    description: 'day_of_month: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: day_of_year
+    description: 'day_of_year: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: week_of_year
+    description: 'week_of_year: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: iso_year_number
+    description: 'iso_year_number: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: month_number
+    description: 'month_number: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: month_name
+    description: 'month_name: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: quarter_number
+    description: 'quarter_number: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: year_number
+    description: 'year_number: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: is_weekend
+    description: 'is_weekend: BOOLEAN; source value; NULL uses typed Unknown default FALSE'
+    data_tests:
+    - not_null
+  - name: inserted_time
+    description: UTC timestamp of this row load; refreshed for changed incremental rows.
+    data_tests:
+    - not_null
+  - name: inserted_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+  - name: updated_time
+    description: UTC timestamp, equal to inserted_time for this row load.
+    data_tests:
+    - not_null
+  - name: updated_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+- name: dim_time
+  description: 'dim_time: distinct source dimension rows plus one Unknown row; table rebuild with UTC build audit.'
+  columns:
+  - name: time_key
+    description: 'time_key: INTEGER; source key preserved; reserved Unknown key -1'
+    data_tests:
+    - not_null
+    - unique
+  - name: time_value
+    description: 'time_value: TIME; source value; NULL uses typed Unknown default TIME ''00:00:00'''
+    data_tests:
+    - not_null
+  - name: hour_number
+    description: 'hour_number: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: minute_number
+    description: 'minute_number: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: second_number
+    description: 'second_number: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: hour_12
+    description: 'hour_12: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: am_pm
+    description: 'am_pm: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: minute_of_day
+    description: 'minute_of_day: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: second_of_day
+    description: 'second_of_day: INTEGER; source value; NULL uses typed Unknown default CAST(-1 AS INTEGER)'
+    data_tests:
+    - not_null
+  - name: time_period
+    description: 'time_period: VARCHAR; source value; NULL uses typed Unknown default ''Unknown'''
+    data_tests:
+    - not_null
+  - name: inserted_time
+    description: UTC timestamp of this row load; refreshed for changed incremental rows.
+    data_tests:
+    - not_null
+  - name: inserted_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+  - name: updated_time
+    description: UTC timestamp, equal to inserted_time for this row load.
+    data_tests:
+    - not_null
+  - name: updated_by
+    description: 'Loader name: dbt.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dbt
+  data_tests:
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: time_key = -1 OR time_key BETWEEN 0 AND 86399
+- name: fact_song_play
+  description: One row per source play_key; incremental insert/update, six FK defaults, other source values unchanged. No
+    automatic source deletes.
+  columns:
+  - name: play_key
+    description: Preserved verbatim from intermediate, including NULL.
+    data_tests:
+    - not_null
+    - unique
+  - name: user_id
+    description: Preserved verbatim from intermediate, including NULL.
+  - name: session_id
+    description: Preserved verbatim from intermediate, including NULL.
+  - name: item_in_session
+    description: Preserved verbatim from intermediate, including NULL.
+  - name: user_key
+    description: Foreign key to dim_user; NULL maps to '-1'.
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('dim_user')
+          field: user_key
+  - name: song_key
+    description: Foreign key to dim_song; NULL maps to '-1'.
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('dim_song')
+          field: song_key
+  - name: session_key
+    description: Foreign key to dim_session; NULL maps to '-1'.
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('dim_session')
+          field: session_key
+  - name: location_key
+    description: Foreign key to dim_location; NULL maps to '-1'.
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('dim_location')
+          field: location_key
+  - name: play_date_key
+    description: Foreign key to dim_date; NULL maps to DATE '1970-01-01'.
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('dim_date')
+          field: date_key
+  - name: play_time_key
+    description: Foreign key to dim_time; NULL maps to -1.
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('dim_time')
+          field: time_key
+  - name: play_started_at
+    description: Preserved verbatim from intermediate, including NULL.
+  - name: play_ended_at
+    description: Preserved verbatim from intermediate, including NULL.
+  - name: listened_seconds
+    description: Preserved verbatim from intermediate, including NULL.
+  - *id001
+  - *id002
+  - *id003
+  - *id004
