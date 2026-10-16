@@ -1,7 +1,6 @@
 __pycache__
 ./__pycache__
 logs/
-poetry.lock
 data/
 .vscode/
 checkpoints/
@@ -9,3 +8,5 @@ checkpoints/
 jars/
 infra/duckdb/data/
 *.duckdb.wal
+.env
+*.duckdb

@@ -42,8 +42,7 @@ def create_or_get_spark_session(app_name: str) -> SparkSession:
 
 def create_kafka_read_stream(
     spark: SparkSession,
-    kafka_address: str,
-    kafka_port: str,
+    bootstrap_servers: str,
     topic: str,
     starting_offset: str = "earliest",
     max_offsets_per_trigger: int = 10_000,
@@ -54,18 +53,15 @@ def create_kafka_read_stream(
     Parameters
     ----------
     spark                   : SparkSession hiện tại
-    kafka_address           : địa chỉ Kafka broker (e.g. "kafka" hoặc "localhost")
-    kafka_port              : port Kafka (e.g. "9092" hoặc "9093")
+    bootstrap_servers       : danh sách host:port phân cách bằng dấu phẩy
     topic                   : tên Kafka topic
     starting_offset         : "earliest" | "latest"
     max_offsets_per_trigger : giới hạn số message mỗi micro-batch
     """
-    bootstrap = f"{kafka_address}:{kafka_port}"
-
     return (
         spark.readStream
         .format("kafka")
-        .option("kafka.bootstrap.servers", bootstrap)
+        .option("kafka.bootstrap.servers", bootstrap_servers)
         .option("subscribe", topic)
         .option("startingOffsets", starting_offset)
         .option("maxOffsetsPerTrigger", max_offsets_per_trigger)

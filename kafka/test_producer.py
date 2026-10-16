@@ -9,16 +9,21 @@ Library: confluent-kafka (da co trong pyproject.toml)
 import json
 import os
 import time
+import sys
 from pathlib import Path
 
 from confluent_kafka import Producer
-from confluent_kafka.admin import AdminClient, NewTopic
+from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'spark'))
+from kafka_cluster import bootstrap_servers, ensure_kafka_topics
+load_dotenv(Path(__file__).resolve().parents[1] / '.env')
 
 # ── Cau hinh ────────────────────────────────────────────────
-BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9093")  # EXTERNAL listener
+BOOTSTRAP_SERVERS = bootstrap_servers()
 TOPIC_NAME        = "test_events"
-NUM_PARTITIONS    = 1
-REPLICATION_FACTOR = 1
+NUM_PARTITIONS    = 2
+REPLICATION_FACTOR = 2
 
 # Thu muc chua du lieu test (kafka/test_data/)
 SCRIPT_DIR = Path(__file__).parent
@@ -27,26 +32,7 @@ TEST_DATA_DIR = SCRIPT_DIR / "test_data"
 # ── Helper ───────────────────────────────────────────────────
 def create_topic_if_not_exists(bootstrap_servers: str, topic: str) -> None:
     """Tao topic neu chua ton tai."""
-    admin = AdminClient({"bootstrap.servers": bootstrap_servers})
-    metadata = admin.list_topics(timeout=10)
-
-    if topic in metadata.topics:
-        print(f"[INFO]  Topic '{topic}' da ton tai, bo qua buoc tao.")
-        return
-
-    new_topic = NewTopic(
-        topic,
-        num_partitions=NUM_PARTITIONS,
-        replication_factor=REPLICATION_FACTOR,
-    )
-    futures = admin.create_topics([new_topic])
-    for t, future in futures.items():
-        try:
-            future.result()
-            print(f"[OK]    Da tao topic '{t}'")
-        except Exception as exc:
-            print(f"[ERROR] Khong tao duoc topic '{t}': {exc}")
-            raise
+    ensure_kafka_topics(bootstrap_servers, [topic])
 
 
 def delivery_report(err, msg) -> None:
@@ -68,6 +54,15 @@ def load_and_produce(producer: Producer, topic: str, data_dir: Path) -> int:
         return 0
 
     total = 0
+    delivered = 0
+    failures = []
+    def on_delivery(err, msg):
+        nonlocal delivered
+        delivery_report(err, msg)
+        if err is None:
+            delivered += 1
+        else:
+            failures.append(str(err))
     for file_path in jsonl_files:
         print(f"\n[INFO]  Dang doc file: {file_path.name}")
         with open(file_path, "r", encoding="utf-8") as f:
@@ -90,7 +85,7 @@ def load_and_produce(producer: Producer, topic: str, data_dir: Path) -> int:
                     topic=topic,
                     key=key,
                     value=value,
-                    callback=delivery_report,
+                    callback=on_delivery,
                 )
 
                 # Poll dinh ky de xu ly callback va tranh day buffer
@@ -99,7 +94,11 @@ def load_and_produce(producer: Producer, topic: str, data_dir: Path) -> int:
 
         print(f"[INFO]  Xong file {file_path.name} — da queue {total} messages den hien tai")
 
-    return total
+    pending = producer.flush(35)
+    if pending or failures or delivered != total:
+        raise RuntimeError(f'Delivery failed: queued={total}, acknowledged={delivered}, '
+                           f'pending={pending}, errors={len(failures)}')
+    return delivered
 
 
 # ── Main ─────────────────────────────────────────────────────
@@ -119,6 +118,7 @@ def main() -> None:
         "bootstrap.servers": BOOTSTRAP_SERVERS,
         "acks": "all",                  # dam bao do bao tin
         "retries": 3,
+        "delivery.timeout.ms": 30_000,
         "linger.ms": 5,                 # gom nhom message de tang throughput
         "batch.size": 16384,
     }
@@ -130,7 +130,7 @@ def main() -> None:
     total_sent = load_and_produce(producer, TOPIC_NAME, TEST_DATA_DIR)
 
     # 4. Flush — doi tat ca message trong queue duoc gui het
-    print(f"\n[INFO]  Dang flush {producer.flush(30)} message con lai trong buffer...")
+    # load_and_produce already flushes and rejects delivery errors.
 
     elapsed = time.time() - start_time
     print("\n" + "=" * 60)

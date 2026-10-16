@@ -4,6 +4,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 import os
 import time
 from dotenv import load_dotenv
+from kafka_cluster import bootstrap_servers, ensure_kafka_topics, INTERNAL_BOOTSTRAP
 
 import schema
 from streaming_functions import (
@@ -18,35 +19,17 @@ from streaming_functions import (
 # ──────────────────────────────────────────────
 load_dotenv()
 
-KAFKA_ADDRESS        = os.getenv("KAFKA_ADDRESS", "kafka")
-KAFKA_PORT           = os.getenv("KAFKA_PORT", "9092")
 HDFS_URL             = os.getenv("HDFS_URL", "hdfs://namenode:9000")
-HDFS_BASE_PATH       = os.getenv("HDFS_BASE_PATH", "/data/events")
-HDFS_CHECKPOINT_PATH = os.getenv("HDFS_CHECKPOINT_PATH", "/checkpoint")
-BOOTSTRAP_SERVERS    = f"{KAFKA_ADDRESS}:{KAFKA_PORT}"
+HDFS_BASE_PATH       = os.getenv("HDFS_BASE_PATH", "/data/events-kafka-v2")
+HDFS_CHECKPOINT_PATH = os.getenv("HDFS_CHECKPOINT_PATH", "/checkpoint/kafka-v2")
+BOOTSTRAP_SERVERS    = bootstrap_servers(default=INTERNAL_BOOTSTRAP)
+TOPIC_PREFIX         = os.getenv("KAFKA_TOPIC_PREFIX", "")  # isolate live smoke topics
 
 print(f"Connecting to Kafka at {BOOTSTRAP_SERVERS}")
 print(f"Target HDFS endpoint: {HDFS_URL} (Base: {HDFS_BASE_PATH})")
 
-def ensure_kafka_topics(bootstrap: str, topics: list) -> None:
-    """Đảm bảo các Kafka topic tồn tại trước khi khởi tạo readStream."""
-    try:
-        from confluent_kafka.admin import AdminClient, NewTopic
-        admin = AdminClient({"bootstrap.servers": bootstrap})
-        metadata = admin.list_topics(timeout=10)
-        missing = [t for t in topics if t not in metadata.topics]
-        if missing:
-            print(f"Khởi tạo các topic còn thiếu: {missing}")
-            new_topics = [NewTopic(t, num_partitions=1, replication_factor=1) for t in missing]
-            futures = admin.create_topics(new_topics)
-            for t, f in futures.items():
-                f.result()
-                print(f"[OK] Đã tạo topic '{t}'")
-    except Exception as exc:
-        print(f"[WARN] Không thể khởi tạo topic tự động: {exc}")
-
 # Tự động tạo topic nếu chưa có
-ensure_kafka_topics(BOOTSTRAP_SERVERS, list(schema.EVENTS.keys()))
+ensure_kafka_topics(BOOTSTRAP_SERVERS, [TOPIC_PREFIX + topic for topic in schema.EVENTS])
 
 # ──────────────────────────────────────────────
 # SparkSession
@@ -64,9 +47,8 @@ for topic, event_schema in schema.EVENTS.items():
     # 1. Đọc từ Kafka
     kafka_df = create_kafka_read_stream(
         spark,
-        kafka_address=KAFKA_ADDRESS,
-        kafka_port=KAFKA_PORT,
-        topic=topic,
+        bootstrap_servers=BOOTSTRAP_SERVERS,
+        topic=TOPIC_PREFIX + topic,
     )
 
     # 2. Parse JSON + thêm partition columns

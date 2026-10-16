@@ -111,5 +111,6 @@ HDFS lưu data lake; DuckDB là nơi phục vụ truy vấn phân tích; dbt th�
 
 ## Báo cáo cuối mỗi nhiệm vụ
 
-Trả lời bằng tiếng Việt, ngắn gọn: thay đổi gì, lý do, các bước đã kiểm chứng và kết quả, hạn chế hoặc blockers. Liệt kê file quan trọng để review. Nêu rõ **chưa commit và chưa push**. Không yêu cầu commit/push như một bước bắt buộc để hoàn tất nhiệm vụ.
+- Không tự accept các sự thay đổi.
+- Trả lời bằng tiếng Việt, ngắn gọn: thay đổi gì, lý do, các bước đã kiểm chứng và kết quả, hạn chế hoặc blockers. Liệt kê file quan trọng để review. Nêu rõ **chưa commit và chưa push**. Không yêu cầu commit/push như một bước bắt buộc để hoàn tất nhiệm vụ.
 
