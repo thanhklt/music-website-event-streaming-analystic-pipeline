@@ -52,12 +52,11 @@ bằng `docker stop kafka` trước khi khởi động cluster mới.
 ```powershell
 docker compose --env-file .env -f .\infra\docker-compose.yml config --quiet
 docker compose --env-file .env -f .\infra\docker-compose.yml up -d --wait kafka-1 kafka-2 kafka-3
-poetry run python .\scripts\test_kafka_cluster.py --provision --check
 ```
 
-Lệnh provision tạo/validate bốn topic nghiệp vụ, không xóa hoặc thay assignment
-của topic có policy sai. Auto-create dùng cùng default 2 partition/RF=2/min ISR=2.
-Spark cũng validate policy trước khi chạy và thoát lỗi sau deadline 60s.
+Auto-create topic hiện bị tắt. Cần provision bốn topic nghiệp vụ trước khi chạy
+producer; giữ policy 2 partition/RF=2/min ISR=2. Spark validate policy trước khi
+chạy và thoát lỗi sau deadline 60s. Công cụ provision cũ đã được loại khỏi repository.
 Ví dụ Spark/JAR hiện dùng: PySpark 4.2.0, spark-sql-kafka-0-10 và
 spark-token-provider-kafka-0-10 Scala 2.13 phiên bản 4.2.0, kafka-clients 3.9.2.
 
@@ -66,55 +65,31 @@ Khởi động HDFS mới và Spark:
 ```powershell
 docker compose --env-file .env -f .\infra\docker-compose.yml up -d --wait namenode datanode
 docker compose --env-file .env -f .\infra\docker-compose.yml up -d --build spark-streaming
-.\scripts\eventsim_start.ps1
+.\eventsim\eventsim_start.ps1
 ```
 
-Eventsim vẫn chạy độc lập. Script mặc định tạo `eventsim-v2`, không xóa/recreate
-container đã tồn tại. Có thể override `EVENTSIM_CONTAINER`, `EVENTSIM_IMAGE`,
-`EVENTSIM_KAFKA_NETWORK`, `EVENTSIM_KAFKA_BOOTSTRAP_SERVERS` bằng `$env:...`.
-Các script Eventsim đọc biến môi trường của process, không tự source `.env`.
-Sample với image `eventsim:2.0` hiện có đã kết nối và gửi dữ liệu thành công;
-runtime log cho thấy producer bên trong dùng **`acks=1`** (Kafka client 2.6.0).
-CLI hiện có không cung cấp tùy chọn acks, nên chưa đổi assembly trong nhiệm vụ
-này. Không áp bảo đảm delivery của producer kiểm chứng `acks=all` cho Eventsim.
+Eventsim chạy độc lập bằng hai script trong `eventsim/`: mỗi lần gọi script sẽ
+build image `events:1.0` rồi chạy container `eventsim-v2` với `config/config.json`,
+20.000 users và `--nocontinuous`. Khoảng thời gian mặc định là 00:00 hôm nay đến
+00:00 ngày mai theo UTC. Container đã tồn tại được giữ nguyên. Xem
+[hướng dẫn Eventsim](eventsim/README.md) để dùng Bash, ghi đè cấu hình và theo dõi batch.
+Script đọc biến môi trường process, không tự nạp `.env`.
+
+Sample trước đây với image `eventsim:2.0` ghi nhận producer dùng `acks=1`;
+CLI không cung cấp tùy chọn acks. Không suy ra delivery guarantee của toàn pipeline
+từ lần chạy đó; launcher mới chưa được chạy batch end-to-end.
 
 Output mới là `/data/events-kafka-v2/<topic>`, checkpoint mới là
 `/checkpoint/kafka-v2/<topic>`. Giữ nguyên hai path khi restart. Không dùng
 checkpoint hoặc output `_spark_metadata` của cluster cũ. `startingOffsets`
 chỉ áp dụng khi chưa có checkpoint hợp lệ.
 
-### Smoke test và kiểm tra phục hồi
+### Artifacts kiểm chứng trước đây
 
-```powershell
-poetry run python -m unittest discover -s .\scripts\tests -p test_kafka_clients.py -v
-poetry run python .\scripts\test_kafka_cluster.py --check
-poetry run python .\scripts\test_kafka_cluster.py --policy-test
-# Hai lệnh sau chủ động stop/start broker mới; chạy khi không có workload khác:
-poetry run python .\scripts\test_kafka_cluster.py --fault-test --restart-test
-# HDFS đang hoạt động: dùng namespace test riêng trên HDFS đó:
-poetry run python .\scripts\pipeline_smoke.py
-# Hoặc dùng cả HDFS test mới, không đụng storage HDFS hiện có:
-poetry run python .\scripts\pipeline_smoke.py --isolated-hdfs
-```
-
-Smoke tạo topic prefix riêng, fixture 2 auth/4 listen/2 page/2 status; đối chiếu
-offset ở cả hai partition với từng dòng Parquet trong commit log. Sau restart
-Spark, fixture được gửi thêm ở offset mới: raw tăng gấp đôi, không replay offset
-đã commit; dbt staging dedup business event nên dashboard vẫn có **4 lượt nghe,
-2 người nghe, 360 giây**. Không suy ra exactly-once cho toàn pipeline.
-
-Ingestion chạy hai lần, so sánh số dòng và ledger; chỉ tải file đã commit theo
-`_spark_metadata`. `dbt build` dùng project/profile/database test; dashboard query
-layer đọc database test sau khi dbt đóng writer. Warehouse thật không bị ghi.
-`scripts/run_pipeline_tests.py` và `scripts/test_recovery_and_batch.py` là các
-entrypoint tương ứng cho smoke không recovery và recovery không downstream.
-Không tuyên bố kiểm chứng quarantine: parser hiện tại chưa có sink quarantine.
-
-Artifacts được giữ tại `data/cluster-smoke/<run-id>/` gồm manifest, database,
-dbt log, Spark log và kết quả. HDFS/topics/volume test cũng được giữ để kiểm tra;
-container test được dừng, không tự xóa dữ liệu. `--isolated-hdfs` cần hai port
-host **19870 và 9864** còn trống, tạo network và volume `cluster-hdfs-smoke-*`
-riêng; không chạy đồng thời nhiều smoke dùng tùy chọn này.
+Các script smoke test cũ đã được loại khỏi repository trong lần tổ chức lại thư mục.
+Artifacts đã có trong `data/cluster-smoke/<run-id>/` vẫn được giữ nguyên để tham khảo;
+chúng không phải kết quả kiểm chứng cho launcher Eventsim mới. Parser Spark hiện tại
+chưa có sink quarantine.
 
 **HDFS đã làm mới theo yêu cầu người dùng:** volume `eventsim-hdfs-v2-name`
 và `eventsim-hdfs-v2-data` mount đúng `/opt/hadoop/dfs/name` và

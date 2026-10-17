@@ -14,7 +14,7 @@ x-kafka: &kafka
     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "2" # Số bản sao (replica) của topic __consumer_offsets
     KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "2"
     KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "2"
-    KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
   healthcheck:
     test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
     interval: 10s
@@ -67,6 +67,21 @@ services:
       KAFKA_PROCESS_ROLES: "controller, broker"
       KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-3:9092,EXTERNAL://127.0.0.1:29093"
 
+  hdfs-init:
+    image: apache/hadoop:3.3.6
+    user: "0"
+    restart: "no"
+    network_mode: none
+    volumes:
+      - namenode-data:/opt/hadoop/dfs/name
+      - datanode-data:/opt/hadoop/dfs/data
+    command:
+      - bash
+      - -ec
+      - |
+        # Only initialize ownership of the volume roots; preserve existing contents.
+        chown "$$(id -u hadoop):$$(id -g hadoop)" /opt/hadoop/dfs/name /opt/hadoop/dfs/data
+
   namenode:
     image: apache/hadoop:3.3.6
     container_name: namenode
@@ -110,6 +125,8 @@ services:
     container_name: datanode
     hostname: datanode
     depends_on:
+      hdfs-init:
+        condition: service_completed_successfully
       namenode:
         condition: service_healthy
     ports:

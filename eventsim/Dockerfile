@@ -9,6 +9,7 @@ WORKDIR /opt/eventsim
 
 COPY eventsim.sh /opt/eventsim/eventsim.sh
 COPY examples /opt/eventsim/examples
+COPY config /opt/eventsim/config
 COPY data /opt/eventsim/data
 COPY target/eventsim-assembly-2.0.jar /opt/eventsim/eventsim-assembly-2.0.jar
 

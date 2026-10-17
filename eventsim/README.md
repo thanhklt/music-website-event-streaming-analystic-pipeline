@@ -2,24 +2,92 @@
 
 Eventsim is a program that generates event data to replicate page requests for a fake music web site (picture something like Spotify); the results look like real use data, but are totally fake. You can find the original repo [here](https://github.com/Interana/eventsim). My docker image is borrowed from [viirya's clone](https://github.com/viirya/eventsim) of it, as the original project has gone without maintenance for a few years now.
 
-### Setup
+### Build và chạy
 
-#### Docker Image
-```bash
-docker build -t events:1.0 .
+Chạy từ root repository, sau khi khởi động ba broker Kafka trong hạ tầng:
+
+```powershell
+docker compose --env-file .env -f .\infra\docker-compose.yml up -d --wait kafka-1 kafka-2 kafka-3
+.\eventsim\eventsim_start.ps1
 ```
 
-#### Run With Kafka Configured On Localhost
+Với Bash trên Linux hoặc Git Bash (cần GNU `date`):
+
 ```bash
-docker run -it \
-  --network host \
-  events:1.0 \
-    -c "examples/example-config.json" \
-    --start-time "`date +"%Y-%m-%dT%H:%M:%S"`" \
-    --end-time "2022-03-18T17:00:00" --nusers 20000 \
-    --kafkaBrokerList localhost:9092 \
-    --continuous
+bash ./eventsim/eventsim_start.sh
 ```
+
+Nếu đang ở thư mục `eventsim/`, dùng `./eventsim_start.ps1` hoặc
+`bash ./eventsim_start.sh`. Script xác định build context theo vị trí của chính nó,
+không theo thư mục làm việc hiện tại.
+
+Mỗi script build image `events:1.0` bằng Dockerfile trong thư mục này (có dùng
+build cache), sau đó gọi `docker run -d`. Không có Compose riêng cho Eventsim.
+Dockerfile đóng gói `config/config.json` vào `/opt/eventsim/config/config.json`;
+sửa config trên host sẽ được đưa vào image ở lần chạy script tiếp theo.
+JAR đầu vào phải có tại `target/eventsim-assembly-2.0.jar`.
+
+Cấu hình chạy mặc định:
+
+| Tham số | Giá trị |
+| --- | --- |
+| Config | `-c config/config.json` |
+| Số người dùng ban đầu | `--nusers 20000` |
+| Khoảng thời gian | 00:00 UTC hôm nay → 00:00 UTC ngày mai |
+| Chế độ | `--nocontinuous` — sinh dữ liệu theo batch, không chờ thời gian thực |
+| Kafka | `kafka-1:9092,kafka-2:9092,kafka-3:9092` |
+| Docker network | `eventsim-net` |
+| Container | `eventsim-v2` |
+| Output | `data/` tại root repository, mount vào `/opt/eventsim/output_data` |
+
+JAR hiện tại **không hỗ trợ `--no-continuous`**; kiểm tra CLI trả về
+`Unknown option 'no-continuous'`. Cờ được hỗ trợ và đã thống nhất dùng là
+`--nocontinuous`. Container dùng `TZ=UTC`.
+
+Hai script đọc biến môi trường của process, không tự nạp `.env`:
+
+| Biến | Mặc định |
+| --- | --- |
+| `EVENTSIM_IMAGE` | `events:1.0` |
+| `EVENTSIM_CONTAINER` | `eventsim-v2` |
+| `EVENTSIM_KAFKA_NETWORK` | `eventsim-net` |
+| `EVENTSIM_KAFKA_BOOTSTRAP_SERVERS` | Danh sách ba broker ở trên |
+| `EVENTSIM_START_TIME` | 00:00 hôm nay UTC |
+| `EVENTSIM_END_TIME` | 00:00 ngày mai UTC |
+
+Ghi đè thời gian bằng định dạng `YYYY-MM-DDTHH:mm:ss`, hiểu là UTC;
+thời điểm kết thúc phải sau thời điểm bắt đầu. Nên đặt cả hai khi chạy khoảng ngày khác:
+
+```powershell
+$env:EVENTSIM_START_TIME = '2026-10-17T00:00:00'
+$env:EVENTSIM_END_TIME = '2026-10-18T00:00:00'
+$env:EVENTSIM_CONTAINER = 'eventsim-batch-20261017'
+.\eventsim\eventsim_start.ps1
+```
+
+```bash
+EVENTSIM_START_TIME=2026-10-17T00:00:00 \
+EVENTSIM_END_TIME=2026-10-18T00:00:00 \
+EVENTSIM_CONTAINER=eventsim-batch-20261017 \
+bash ./eventsim/eventsim_start.sh
+```
+
+Script chờ healthcheck của ba broker tối đa 60 giây, kiểm tra network và dừng nếu
+build lỗi. Container cùng tên đã tồn tại sẽ được giữ nguyên; chọn tên mới bằng
+`EVENTSIM_CONTAINER` để chạy batch mới. Chạy lại một container đã dừng bằng
+`docker start` sẽ chạy lại khoảng thời gian cũ và có thể phát lại dữ liệu.
+
+Theo dõi và dừng (thay tên nếu đã override):
+
+```powershell
+docker logs -f eventsim-v2
+docker inspect eventsim-v2 --format '{{.State.Status}} {{.State.ExitCode}}'
+docker stop eventsim-v2
+```
+
+Script chỉ kiểm tra trạng thái ban đầu sau khi tạo container. `running` chưa có
+nghĩa batch đã hoàn tất hoặc Kafka đã nhận đủ dữ liệu; cần kiểm tra log và exit code
+khi container kết thúc. Output và container không bị tự xóa.
 
 ### Data Profile
 
