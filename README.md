@@ -1,6 +1,15 @@
 # eventsim-analystic-pipeline
 
+
+
+--- INSIGHTS:
+
+- dataset do đã được đóng gói thành JAR chỉ cho phép sử dụng giao thức PLAINTEXT
+- Vì đây là dữ liệu mock, thời gian đi vào hệ thống không gần với thời gian sinh ra events nên hệ thống set WaterMark bằng kafka_timestamp
 ## Kafka cluster local: 3 broker
+
+-- KNOWN PROBLEM:
+- Bug when running kafka_to_hdfs.py
 
 Compose chuẩn nằm tại `infra/docker-compose.yml`. Ba node KRaft kiêm
 broker/controller dùng **2 partition/topic nghiệp vụ, RF=2, min ISR=2**.

@@ -1,35 +1,30 @@
 import sys
+
 sys.stdout.reconfigure(encoding="utf-8")
 
-import os
-import time
-from dotenv import load_dotenv
-from kafka_cluster import bootstrap_servers, ensure_kafka_topics, INTERNAL_BOOTSTRAP
 
-import schema
-from streaming_functions import (
+from spark.streaming import schema
+from spark.streaming.functions import (
     create_or_get_spark_session,
     create_kafka_read_stream,
     parse_event,
     create_hdfs_write_stream,
 )
 
+from config.settings import read_config, Settings
+
 # ──────────────────────────────────────────────
 # Config
 # ──────────────────────────────────────────────
-load_dotenv()
+settings: Settings = read_config()
 
-HDFS_URL             = os.getenv("HDFS_URL", "hdfs://namenode:9000")
-HDFS_BASE_PATH       = os.getenv("HDFS_BASE_PATH", "/data/events-kafka-v2")
-HDFS_CHECKPOINT_PATH = os.getenv("HDFS_CHECKPOINT_PATH", "/checkpoint/kafka-v2")
-BOOTSTRAP_SERVERS    = bootstrap_servers(default=INTERNAL_BOOTSTRAP)
-TOPIC_PREFIX         = os.getenv("KAFKA_TOPIC_PREFIX", "")  # isolate live smoke topics
+HDFS_URL             = settings.HDFS_URL
+HDFS_BASE_PATH       = settings.HDFS_BASE_PATH
+HDFS_CHECKPOINT_PATH = settings.HDFS_CHECKPOINT_PATH
+BOOTSTRAP_SERVERS    = settings.KAFKA_BOOTSTRAP_SERVERS
 
 print(f"Connecting to Kafka at {BOOTSTRAP_SERVERS}")
 print(f"Target HDFS endpoint: {HDFS_URL} (Base: {HDFS_BASE_PATH})")
-
-# Tự động tạo topic nếu chưa có
-ensure_kafka_topics(BOOTSTRAP_SERVERS, [TOPIC_PREFIX + topic for topic in schema.EVENTS])
 
 # ──────────────────────────────────────────────
 # SparkSession
@@ -41,14 +36,14 @@ print("Khởi tạo SparkSession thành công")
 # ──────────────────────────────────────────────
 # Streaming pipeline: mỗi Kafka topic → HDFS
 # ──────────────────────────────────────────────
-for topic, event_schema in schema.EVENTS.items():
+for topic, event_schema in schema.events.items():
     print(f"INFO: Khởi động stream cho topic '{topic}'...")
 
     # 1. Đọc từ Kafka
     kafka_df = create_kafka_read_stream(
         spark,
         bootstrap_servers=BOOTSTRAP_SERVERS,
-        topic=TOPIC_PREFIX + topic,
+        topic=topic
     )
 
     # 2. Parse JSON + thêm partition columns
@@ -61,6 +56,7 @@ for topic, event_schema in schema.EVENTS.items():
         hdfs_url=HDFS_URL,
         base_path=HDFS_BASE_PATH,
         checkpoint_base=HDFS_CHECKPOINT_PATH,
+        format=settings.HDFS_OUTPUT_FORMAT,
     )
 
 print("Tất cả streams đã khởi động. Đang lắng nghe...")

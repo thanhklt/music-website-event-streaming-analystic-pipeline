@@ -1,0 +1,15 @@
+# Kafka
+KAFKA_ADDRESS: "localhost"
+KAFKA_PORT: 9093
+KAFKA_BOOTSTRAP_SERVERS: "127.0.0.1:9093,127.0.0.1:19093,127.0.0.1:29093"
+KAFKA_CLUSTER_ID: "eventsim-kafka-cluster"
+
+# HDFS
+HDFS_URL: "hdfs://localhost:9000"
+HDFS_BASE_PATH: "/data/eventsim"
+HDFS_CHECKPOINT_PATH: "/checkpoint/eventsim"
+HDFS_NAMENODE_HTTP: "http://localhost:9870"
+HDFS_OUTPUT_FORMAT: 'parquet'
+
+# HUE
+HUE_PORT: 8888

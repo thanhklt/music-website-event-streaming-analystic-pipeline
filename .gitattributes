@@ -1,0 +1,2 @@
+# Linux shell scripts must keep LF when checked out on Windows.
+*.sh text eol=lf

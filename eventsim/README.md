@@ -89,6 +89,31 @@ Script chỉ kiểm tra trạng thái ban đầu sau khi tạo container. `runni
 nghĩa batch đã hoàn tất hoặc Kafka đã nhận đủ dữ liệu; cần kiểm tra log và exit code
 khi container kết thúc. Output và container không bị tự xóa.
 
+### Lỗi khởi động trên Windows: `eventsim.sh: no such file or directory`
+
+Nếu file vẫn có trong image nhưng container thoát `255`, kiểm tra xuống dòng
+`CRLF` ở dòng shebang: Linux có thể hiểu interpreter là `/bin/bash\r` thay vì
+`/bin/bash`. `.gitattributes` giữ shell scripts ở dạng `LF`; Dockerfile cũng
+chuẩn hóa entrypoint khi build để xử lý working copy Windows còn `CRLF`.
+
+Build lại và kiểm tra entrypoint độc lập, không kết nối Kafka hoặc sinh dữ liệu:
+
+```powershell
+docker build --tag events:1.0 .\eventsim
+docker run --rm --network none events:1.0 --help
+```
+
+Build image mới không cập nhật container đã tạo. Nếu `eventsim-v2` lỗi vẫn tồn tại,
+giữ lại để kiểm tra và chọn tên container mới khi chạy launcher:
+
+```powershell
+$env:EVENTSIM_CONTAINER = 'eventsim-v2-fixed'
+.\eventsim\eventsim_start.ps1
+```
+
+Lệnh launcher trên chạy batch với tham số mặc định đã mô tả; `--help` chỉ kiểm tra
+entrypoint/JAR, chưa chứng minh Kafka đã nhận dữ liệu.
+
 ### Data Profile
 
 #### Event `auth`

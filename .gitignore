@@ -1,12 +1,24 @@
+# Python
 __pycache__
 ./__pycache__
+
+# Logs
 logs/
+
+# Data
 data/
+
+# IDE
 .vscode/
-checkpoints/
+
+# ENV
 .env/
+
+# Infra
 jars/
 infra/duckdb/data/
 *.duckdb.wal
 .env
 *.duckdb
+
+infra/kafka/

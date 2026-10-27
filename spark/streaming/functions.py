@@ -1,8 +1,9 @@
-import os
+from pathlib import Path
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-
+SPARK_PARTITION = 4
+DATA_AND_NAME_NODE = "true"
 # ──────────────────────────────────────────────
 # 1. SparkSession
 # ──────────────────────────────────────────────
@@ -12,26 +13,22 @@ def create_or_get_spark_session(app_name: str) -> SparkSession:
     Khởi tạo hoặc lấy SparkSession hiện có.
     HDFS native client và Kafka connector JARs được nạp tại đây.
     """
-    jars_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../jars"))
+    jars_dir = Path(__file__).resolve().parents[2] / "jars"
+    jar_files = sorted(jars_dir.glob("*.jar"))
+    if not jar_files:
+        raise FileNotFoundError(f"No Spark connector JARs found in {jars_dir}")
 
-    # Liệt kê tất cả JAR trong thư mục jars/ ngoại trừ gcs-connector
-    jar_files = []
-    if os.path.exists(jars_dir):
-        jar_files = [
-            os.path.join(jars_dir, f)
-            for f in os.listdir(jars_dir)
-        ]
-    jars_str = ",".join(jar_files)
 
     builder = (
         SparkSession.builder
         .appName(app_name)
-        .config("spark.sql.shuffle.partitions", "4")
-        .config("spark.hadoop.dfs.client.use.datanode.hostname", "true")
+        .config("spark.sql.shuffle.partitions", SPARK_PARTITION)
+        .config("spark.hadoop.dfs.client.use.datanode.hostname", DATA_AND_NAME_NODE)
     )
 
-    if jars_str:
-        builder = builder.config("spark.jars", jars_str)
+    # Repeating config("spark.jars", ...) replaces the previous value.
+    jars_str = ",".join(jar_file.as_uri() for jar_file in jar_files)
+    builder = builder.config("spark.jars", jars_str)
 
     return builder.getOrCreate()
 
@@ -111,7 +108,7 @@ def parse_event(kafka_df, schema):
         .withColumn("day",   F.dayofmonth(F.col("ts")))
         .withColumn("hour",  F.hour(F.col("ts")))
         # Watermark để xử lý late data
-        .withWatermark("ts", "30 minutes")
+        .withWatermark("kafka_timestamp", "30 minutes")
     )
 
 
@@ -122,9 +119,10 @@ def parse_event(kafka_df, schema):
 def create_hdfs_write_stream(
     df,
     topic: str,
-    hdfs_url: str = "hdfs://namenode:9000",
-    base_path: str = "/data/events",
-    checkpoint_base: str = "/checkpoint",
+    hdfs_url: str,
+    base_path: str,
+    checkpoint_base: str,
+    format: str = "parquet",
     trigger_interval: str = "10 seconds",
 ):
     """
@@ -144,7 +142,7 @@ def create_hdfs_write_stream(
     -------
     StreamingQuery   : đối tượng query (cần awaitAnyTermination)
     """
-    hdfs_url = hdfs_url.rstrip("/")
+    hdfs_url = hdfs_url.strip("/")
     base_path = base_path.strip("/")
     checkpoint_base = checkpoint_base.strip("/")
 
@@ -153,8 +151,8 @@ def create_hdfs_write_stream(
 
     return (
         df.writeStream
-        .format("parquet")
-        .partitionBy("year", "month", "day")
+        .format(format)
+        .partitionBy("year", "month", "day") # Tạo Hive-stye partition
         .outputMode("append")
         .option("path", output_path)
         .option("checkpointLocation", checkpoint_path)

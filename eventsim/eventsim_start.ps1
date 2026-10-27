@@ -1,9 +1,11 @@
 # Build and run Eventsim independently of the infrastructure Compose project.
 $ErrorActionPreference = 'Stop'
-$eventsimImage = if ($env:EVENTSIM_IMAGE) { $env:EVENTSIM_IMAGE } else { 'events:1.0' }
-$eventsimContainer = if ($env:EVENTSIM_CONTAINER) { $env:EVENTSIM_CONTAINER } else { 'eventsim-v2' }
-$kafkaBootstrap = if ($env:EVENTSIM_KAFKA_BOOTSTRAP_SERVERS) { $env:EVENTSIM_KAFKA_BOOTSTRAP_SERVERS } else { 'kafka-1:9092,kafka-2:9092,kafka-3:9092' }
-$kafkaNetwork = if ($env:EVENTSIM_KAFKA_NETWORK) { $env:EVENTSIM_KAFKA_NETWORK } else { 'eventsim-net' }
+$env:EVENTSIM_CONTAINER = 'eventsim'
+
+$eventsimImage = 'img_eventsim'
+$eventsimContainer = 'eventsim'
+$kafkaBootstrap = 'kafka-1:9092,kafka-2:9092,kafka-3:9092'
+$kafkaNetwork = 'eventsim-net'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $dataDirectory = Join-Path $projectRoot 'data'
 $todayUtc = [DateTime]::UtcNow.Date

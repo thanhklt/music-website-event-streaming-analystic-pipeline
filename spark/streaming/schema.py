@@ -94,7 +94,7 @@ status_change_events = StructType([
     StructField("registration", LongType(), True),
 ])
 
-EVENTS = {
+events = {
     "auth_events": auth_events,
     "listen_events": listen_events,
     "page_view_events": page_view_events,  # Kafka topic name là "page_view_events"

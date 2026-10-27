@@ -13,5 +13,7 @@ COPY config /opt/eventsim/config
 COPY data /opt/eventsim/data
 COPY target/eventsim-assembly-2.0.jar /opt/eventsim/eventsim-assembly-2.0.jar
 
-RUN chmod +x /opt/eventsim/eventsim.sh
+# Windows build contexts may still contain CRLF before a fresh Git checkout.
+RUN sed -i 's/\r$//' /opt/eventsim/eventsim.sh \
+    && chmod +x /opt/eventsim/eventsim.sh
 ENTRYPOINT ["/opt/eventsim/eventsim.sh"]
