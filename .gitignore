@@ -22,3 +22,6 @@ infra/duckdb/data/
 *.duckdb
 
 infra/kafka/
+
+# AI Artifact
+plan/

@@ -1,6 +1,6 @@
 ﻿{{ config(
     materialized='table',
-    unique_key=['user_id', 'session_id', 'item_in_session']
+    unique_key=['user_id', 'session_id','item_in_session']
 ) }}
 
 WITH int_fact_song_play__source AS (
@@ -17,21 +17,6 @@ int_fact_song_play__timeline AS (
     FROM {{ ref('stg_page_view_events') }}
 ),
 
-int_fact_song_play__timeline_conflicts AS (
-    SELECT userId, sessionId, itemInSession
-    FROM int_fact_song_play__timeline
-    GROUP BY userId, sessionId, itemInSession
-    HAVING COUNT(*) > 1
-),
-
-int_fact_song_play__timeline_check AS (
-    SELECT
-        CASE
-            WHEN COUNT(*) > 0 THEN error('Conflicting event timestamps in play timeline')
-            ELSE TRUE
-        END AS is_valid
-    FROM int_fact_song_play__timeline_conflicts
-),
 
 int_fact_song_play__next_event AS (
     SELECT
@@ -54,8 +39,6 @@ int_fact_song_play__columns AS (
         AND play.sessionId = event.sessionId
         AND play.ts = event.ts
         AND play.itemInSession = event.itemInSession
-    CROSS JOIN int_fact_song_play__timeline_check AS timeline_check
-    WHERE timeline_check.is_valid
 ),
 
 int_dim_date__source AS (

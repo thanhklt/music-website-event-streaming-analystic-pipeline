@@ -8,13 +8,24 @@ $kafkaBootstrap = 'kafka-1:9092,kafka-2:9092,kafka-3:9092'
 $kafkaNetwork = 'eventsim-net'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $dataDirectory = Join-Path $projectRoot 'data'
-$todayUtc = [DateTime]::UtcNow.Date
-$startTime = if ($env:EVENTSIM_START_TIME) { $env:EVENTSIM_START_TIME } else { $todayUtc.ToString('yyyy-MM-ddTHH:mm:ss') }
-$endTime = if ($env:EVENTSIM_END_TIME) { $env:EVENTSIM_END_TIME } else { $todayUtc.AddDays(1).ToString('yyyy-MM-ddTHH:mm:ss') }
+# Required simulation interval in UTC. Set both values explicitly; no defaults.
+$startTime = '2026-06-01T00:00:00'
+$endTime = '2026-12-31T23:59:59'
+if ([string]::IsNullOrWhiteSpace($startTime)) {
+    throw 'startTime is required. Set it explicitly using yyyy-MM-ddTHH:mm:ss (UTC).'
+}
+if ([string]::IsNullOrWhiteSpace($endTime)) {
+    throw 'endTime is required. Set it explicitly using yyyy-MM-ddTHH:mm:ss (UTC).'
+}
 $utcStyle = [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal
-$startUtc = [DateTime]::ParseExact($startTime, 'yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture, $utcStyle)
-$endUtc = [DateTime]::ParseExact($endTime, 'yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture, $utcStyle)
-if ($endUtc -le $startUtc) { throw 'EVENTSIM_END_TIME must be after EVENTSIM_START_TIME (UTC).' }
+try {
+    $startUtc = [DateTime]::ParseExact($startTime, 'yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture, $utcStyle)
+    $endUtc = [DateTime]::ParseExact($endTime, 'yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture, $utcStyle)
+}
+catch {
+    throw 'Invalid startTime or endTime. Use yyyy-MM-ddTHH:mm:ss (UTC).'
+}
+if ($endUtc -le $startUtc) { throw 'endTime must be after startTime (UTC).' }
 foreach ($relativePath in @('config/config.json', 'target/eventsim-assembly-2.0.jar')) {
     if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $relativePath) -PathType Leaf)) {
         throw "Missing Eventsim file: $relativePath"

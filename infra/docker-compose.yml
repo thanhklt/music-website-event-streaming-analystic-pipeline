@@ -119,8 +119,7 @@ services:
 
   hdfs-init:
     image: apache/hadoop:3.3.6
-    user: "0"
-    restart: "no"
+    user: "0" # Lấy user root cấp quyền cho hadoop
     network_mode: none
     volumes:
       - namenode-data:/opt/hadoop/dfs/name
@@ -197,24 +196,6 @@ services:
       timeout: 10s
       retries: 12
       start_period: 30s
-    networks:
-      - eventsim-net
-
-  hue:
-    image: gethue/hue:latest
-    container_name: hue
-    hostname: hue
-    depends_on:
-      namenode:
-        condition: service_healthy
-      datanode:
-        condition: service_healthy
-    ports:
-      - "8888:8888"   # Hue Web UI
-    volumes:
-      - ./hue/hue.ini:/usr/share/hue/desktop/conf/z-hue.ini:ro
-    environment:
-      - HUE_IGNORE_PASSWORD_VALIDATION=true
     networks:
       - eventsim-net
 

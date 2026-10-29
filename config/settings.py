@@ -24,8 +24,8 @@ class Settings:
     HDFS_CHECKPOINT_PATH: str
     HDFS_NAMENODE_HTTP: str
     HDFS_OUTPUT_FORMAT: str
-    HUE_PORT: int
-
+    DUCKDB_PATH: str
+    STAGING_DIR: str
 
 def parse_config(config: dict[str, Any]) -> None:
     """Raise ValueError for missing/unknown keys, wrong types or invalid values."""

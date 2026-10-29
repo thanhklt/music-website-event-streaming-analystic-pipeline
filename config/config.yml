@@ -11,5 +11,6 @@ HDFS_CHECKPOINT_PATH: "/checkpoint/eventsim"
 HDFS_NAMENODE_HTTP: "http://localhost:9870"
 HDFS_OUTPUT_FORMAT: 'parquet'
 
-# HUE
-HUE_PORT: 8888
+# Batch ingestion (local paths relative to the project root)
+DUCKDB_PATH: "infra/duckdb/data/warehouse.duckdb"
+STAGING_DIR: "staging"

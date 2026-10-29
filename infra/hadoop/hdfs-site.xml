@@ -41,6 +41,6 @@
     <property>
     
     <name>dfs.datanode.hostname</name>
-    <value>localhost</val    ue>
+    <value>localhost</value>
     </property>
 </configuration>
